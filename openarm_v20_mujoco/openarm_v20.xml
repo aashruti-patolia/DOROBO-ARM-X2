@@ -1,0 +1,353 @@
+<mujoco model="openarm_v20">
+  <compiler angle="radian" meshdir="mj_meshes"/>
+
+  <visual>
+    <headlight ambient="0.3 0.3 0.3" diffuse="0.45 0.45 0.45"/>
+  </visual>
+
+  <asset>
+    <mesh name="robot__openarm_v2.0__body__visual__body_link0" content_type="model/stl" file="robot__openarm_v2.0__body__visual__body_link0.stl"/>
+    <mesh name="robot__openarm_v2.0__body__collision__body_link0_symp" content_type="model/stl" file="robot__openarm_v2.0__body__collision__body_link0_symp.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="robot__openarm_v2.0__arm__visual__base_link" content_type="model/stl" file="robot__openarm_v2.0__arm__visual__base_link.stl" scale="1 -1 1"/>
+    <mesh name="robot__openarm_v2.0__arm__collision__base_link" content_type="model/stl" file="robot__openarm_v2.0__arm__collision__base_link.stl" scale="1 -1 1"/>
+    <mesh name="robot__openarm_v2.0__arm__visual__link1" content_type="model/stl" file="robot__openarm_v2.0__arm__visual__link1.stl" scale="1 -1 1"/>
+    <mesh name="robot__openarm_v2.0__arm__collision__link1" content_type="model/stl" file="robot__openarm_v2.0__arm__collision__link1.stl" scale="1 -1 1"/>
+    <mesh name="robot__openarm_v2.0__arm__visual__link2" content_type="model/stl" file="robot__openarm_v2.0__arm__visual__link2.stl" scale="1 -1 1"/>
+    <mesh name="robot__openarm_v2.0__arm__collision__link2" content_type="model/stl" file="robot__openarm_v2.0__arm__collision__link2.stl" scale="1 -1 1"/>
+    <mesh name="robot__openarm_v2.0__arm__visual__link3" content_type="model/stl" file="robot__openarm_v2.0__arm__visual__link3.stl"/>
+    <mesh name="robot__openarm_v2.0__arm__collision__link3" content_type="model/stl" file="robot__openarm_v2.0__arm__collision__link3.stl"/>
+    <mesh name="robot__openarm_v2.0__arm__visual__link4" content_type="model/stl" file="robot__openarm_v2.0__arm__visual__link4.stl"/>
+    <mesh name="robot__openarm_v2.0__arm__collision__link4" content_type="model/stl" file="robot__openarm_v2.0__arm__collision__link4.stl"/>
+    <mesh name="robot__openarm_v2.0__arm__visual__link5" content_type="model/stl" file="robot__openarm_v2.0__arm__visual__link5.stl" scale="1 -1 1"/>
+    <mesh name="robot__openarm_v2.0__arm__collision__link5" content_type="model/stl" file="robot__openarm_v2.0__arm__collision__link5.stl" scale="1 -1 1"/>
+    <mesh name="robot__openarm_v2.0__arm__visual__link6" content_type="model/stl" file="robot__openarm_v2.0__arm__visual__link6.stl" scale="1 -1 1"/>
+    <mesh name="robot__openarm_v2.0__arm__collision__link6" content_type="model/stl" file="robot__openarm_v2.0__arm__collision__link6.stl" scale="1 -1 1"/>
+    <mesh name="end_effector__pinch_gripper__visual__ee_base_link" content_type="model/stl" file="end_effector__pinch_gripper__visual__ee_base_link.stl" scale="1 -1 1"/>
+    <mesh name="end_effector__pinch_gripper__collision__ee_base_link" content_type="model/stl" file="end_effector__pinch_gripper__collision__ee_base_link.stl" scale="1 -1 1"/>
+    <mesh name="end_effector__pinch_gripper__visual__finger_inner" content_type="model/stl" file="end_effector__pinch_gripper__visual__finger_inner.stl" scale="1 -1 1"/>
+    <mesh name="end_effector__pinch_gripper__collision__finger_inner" content_type="model/stl" file="end_effector__pinch_gripper__collision__finger_inner.stl" scale="1 -1 1"/>
+    <mesh name="end_effector__pinch_gripper__visual__finger_outer" content_type="model/stl" file="end_effector__pinch_gripper__visual__finger_outer.stl" scale="1 -1 1"/>
+    <mesh name="end_effector__pinch_gripper__collision__finger_outer" content_type="model/stl" file="end_effector__pinch_gripper__collision__finger_outer.stl" scale="1 -1 1"/>
+    <mesh name="robot__openarm_v2.0__arm__visual__base_link1" content_type="model/stl" file="robot__openarm_v2.0__arm__visual__base_link.stl"/>
+    <mesh name="robot__openarm_v2.0__arm__collision__base_link1" content_type="model/stl" file="robot__openarm_v2.0__arm__collision__base_link.stl"/>
+    <mesh name="robot__openarm_v2.0__arm__visual__link11" content_type="model/stl" file="robot__openarm_v2.0__arm__visual__link1.stl"/>
+    <mesh name="robot__openarm_v2.0__arm__collision__link11" content_type="model/stl" file="robot__openarm_v2.0__arm__collision__link1.stl"/>
+    <mesh name="robot__openarm_v2.0__arm__visual__link21" content_type="model/stl" file="robot__openarm_v2.0__arm__visual__link2.stl"/>
+    <mesh name="robot__openarm_v2.0__arm__collision__link21" content_type="model/stl" file="robot__openarm_v2.0__arm__collision__link2.stl"/>
+    <mesh name="robot__openarm_v2.0__arm__visual__link51" content_type="model/stl" file="robot__openarm_v2.0__arm__visual__link5.stl"/>
+    <mesh name="robot__openarm_v2.0__arm__collision__link51" content_type="model/stl" file="robot__openarm_v2.0__arm__collision__link5.stl"/>
+    <mesh name="robot__openarm_v2.0__arm__visual__link61" content_type="model/stl" file="robot__openarm_v2.0__arm__visual__link6.stl"/>
+    <mesh name="robot__openarm_v2.0__arm__collision__link61" content_type="model/stl" file="robot__openarm_v2.0__arm__collision__link6.stl"/>
+    <mesh name="end_effector__pinch_gripper__visual__ee_base_link1" content_type="model/stl" file="end_effector__pinch_gripper__visual__ee_base_link.stl"/>
+    <mesh name="end_effector__pinch_gripper__collision__ee_base_link1" content_type="model/stl" file="end_effector__pinch_gripper__collision__ee_base_link.stl"/>
+    <mesh name="end_effector__pinch_gripper__visual__finger_inner1" content_type="model/stl" file="end_effector__pinch_gripper__visual__finger_inner.stl"/>
+    <mesh name="end_effector__pinch_gripper__collision__finger_inner1" content_type="model/stl" file="end_effector__pinch_gripper__collision__finger_inner.stl"/>
+    <mesh name="end_effector__pinch_gripper__visual__finger_outer1" content_type="model/stl" file="end_effector__pinch_gripper__visual__finger_outer.stl"/>
+    <mesh name="end_effector__pinch_gripper__collision__finger_outer1" content_type="model/stl" file="end_effector__pinch_gripper__collision__finger_outer.stl"/>
+  </asset>
+
+  <worldbody>
+    <geom size="2 2 0.05" type="plane" contype="0" conaffinity="0" rgba="0.62 0.66 0.7 1"/>
+    <light pos="1 -1 2.5" dir="-0.348155 0.348155 -0.870388" diffuse="0.35 0.35 0.35"/>
+
+    <!-- ===== Sensor 4: Area Sensors / Light Curtains (Safety) ===== -->
+    <!-- Mounted around the OpenArm Cell evaluation enclosure. -->
+    <!-- These sites define the intrusion detection boundary planes. -->
+    <!-- Rangefinder sensors cast rays inward to detect workspace breach. -->
+    <site name="safety_curtain_front"  pos="0 -0.8 0.5" quat="0.707107 0 0 0.707107" type="box" size="0.8 0.5 0.005" rgba="1 0 0 0.08" group="4"/>
+    <site name="safety_curtain_back"   pos="0  0.8 0.5" quat="0.707107 0 0 -0.707107" type="box" size="0.8 0.5 0.005" rgba="1 0 0 0.08" group="4"/>
+    <site name="safety_curtain_left"   pos="-0.8 0 0.5" quat="0.707107 0 -0.707107 0" type="box" size="0.8 0.5 0.005" rgba="1 0 0 0.08" group="4"/>
+    <site name="safety_curtain_right"  pos="0.8  0 0.5" quat="0.707107 0 0.707107 0"  type="box" size="0.8 0.5 0.005" rgba="1 0 0 0.08" group="4"/>
+    <geom name="openarm_body_link0_visual" pos="0 0 0" quat="1 0 0 0" type="mesh" contype="0" conaffinity="0" group="1" rgba="0.55 0.6 0.68 1" density="0" mesh="robot__openarm_v2.0__body__visual__body_link0"/>
+    <geom name="openarm_body_link0_collision" pos="0 0 0" quat="1 0 0 0" type="mesh" group="3" mesh="robot__openarm_v2.0__body__collision__body_link0_symp"/>
+
+    <!-- ===== Sensor 5: Head Camera — ZED Stereo Depth Camera ===== -->
+    <!-- Mounted on the FRONT of the central pedestal column (MISUMI extrusion) -->
+    <!-- between the shoulders at X = +0.08 m, Z = 0.79 m. Provides a top-down   -->
+    <!-- egocentric perspective facing forward (+X) and tilted downward (35°)   -->
+    <!-- toward the manipulation workspace. ZED Mini baseline: 63 mm.            -->
+    <body name="openarm_head_camera_mount" pos="0.08 0 0.79" quat="0.953717 0 0.300706 0">
+      <inertial pos="0 0 0" mass="0.063" diaginertia="1e-5 1e-5 1e-5"/>
+      <!-- Visual representation of the ZED Mini camera body (front-facing) -->
+      <geom name="head_camera_body" type="box"
+            size="0.0085 0.0875 0.0165" pos="0 0 0"
+            contype="0" conaffinity="0" group="1"
+            rgba="0.15 0.15 0.15 1" density="0"/>
+      <!-- Left lens indicator (robot left side = +Y) -->
+      <geom name="head_camera_lens_left" type="cylinder"
+            size="0.007 0.003" pos="0.01 0.0315 0"
+            quat="0.707107 0 0.707107 0"
+            contype="0" conaffinity="0" group="1"
+            rgba="0.05 0.05 0.3 1" density="0"/>
+      <!-- Right lens indicator (robot right side = -Y) -->
+      <geom name="head_camera_lens_right" type="cylinder"
+            size="0.007 0.003" pos="0.01 -0.0315 0"
+            quat="0.707107 0 0.707107 0"
+            contype="0" conaffinity="0" group="1"
+            rgba="0.05 0.05 0.3 1" density="0"/>
+
+      <!-- Stereo camera pair (63 mm baseline, looking forward +X, pitched 35° down) -->
+      <camera name="openarm_head_camera_left"
+              pos="0 0.0315 0"
+              quat="0.5 0.5 -0.5 -0.5"
+              fovy="60" resolution="1280 720"/>
+      <camera name="openarm_head_camera_right"
+              pos="0 -0.0315 0"
+              quat="0.5 0.5 -0.5 -0.5"
+              fovy="60" resolution="1280 720"/>
+      <!-- Mono centre viewpoint for convenience (RL training default) -->
+      <camera name="openarm_head_camera_center"
+              pos="0 0 0"
+              quat="0.5 0.5 -0.5 -0.5"
+              fovy="60" resolution="1280 720"/>
+    </body>
+
+    <frame pos="0 0.03 0.697">
+      <geom name="openarm_left_base_link_visual" quat="1 0 0 0" type="mesh" contype="0" conaffinity="0" group="1" rgba="0.55 0.6 0.68 1" density="0" mesh="robot__openarm_v2.0__arm__visual__base_link"/>
+      <geom name="openarm_left_base_link_collision" quat="1 0 0 0" type="mesh" group="3" mesh="robot__openarm_v2.0__arm__collision__base_link"/>
+      <body name="openarm_left_link1" pos="0 0.0625 0" gravcomp="1">
+        <inertial pos="0.00090035 0.044466 2.88441e-05" quat="0.999901 -0.000371041 -5.04627e-05 -0.0140339" mass="1.14167" diaginertia="0.00109459 0.000758935 0.000670659"/>
+        <joint name="openarm_left_joint1" range="-3.4907 1.3963" actuatorfrcrange="-40 40" armature="0.01" damping="1" axis="0 1 0"/>
+        <geom name="openarm_left_link1_visual" quat="1 0 0 0" type="mesh" contype="0" conaffinity="0" group="1" rgba="0.55 0.6 0.68 1" density="0" mesh="robot__openarm_v2.0__arm__visual__link1"/>
+        <geom name="openarm_left_link1_collision" quat="1 0 0 0" type="mesh" group="3" mesh="robot__openarm_v2.0__arm__collision__link1"/>
+        <body name="openarm_left_link2" pos="0 0.06 0" gravcomp="1">
+          <inertial pos="-0.0247185 -7.60578e-08 -0.0312643" quat="0.999342 -6.47495e-06 -0.0362804 3.02331e-06" mass="0.277509" diaginertia="0.000153968 0.000113062 8.19211e-05"/>
+          <joint name="openarm_left_joint2" range="-3.3161 0.17453" actuatorfrcrange="-40 40" armature="0.01" damping="1" axis="-1 0 0"/>
+          <geom name="openarm_left_link2_visual" quat="1 0 0 0" type="mesh" contype="0" conaffinity="0" group="1" rgba="0.55 0.6 0.68 1" density="0" mesh="robot__openarm_v2.0__arm__visual__link2"/>
+          <geom name="openarm_left_link2_collision" type="mesh" group="3" mesh="robot__openarm_v2.0__arm__collision__link2"/>
+          <body name="openarm_left_link3" pos="0 0 -0.06625" gravcomp="1">
+            <inertial pos="-0.00300862 -0.000514813 -0.109368" quat="0.998906 -0.00891354 0.0458105 0.00280505" mass="1.07386" diaginertia="0.00129561 0.00114038 0.000553361"/>
+            <joint name="openarm_left_joint3" range="-1.5708 1.5708" actuatorfrcrange="-27 27" armature="0.01" damping="1" axis="0 0 -1"/>
+            <geom name="openarm_left_link3_visual" quat="1 0 0 0" type="mesh" contype="0" conaffinity="0" group="1" rgba="0.55 0.6 0.68 1" density="0" mesh="robot__openarm_v2.0__arm__visual__link3"/>
+            <geom name="openarm_left_link3_collision" quat="1 0 0 0" type="mesh" group="3" mesh="robot__openarm_v2.0__arm__collision__link3"/>
+            <body name="openarm_left_link4" pos="0 0 -0.15375" gravcomp="1">
+              <inertial pos="-0.00310326 -0.00136539 -0.0574601" quat="0.996953 0.00947291 0.00348081 0.0773554" mass="0.634853" diaginertia="0.000469894 0.000433114 0.000245134"/>
+              <joint name="openarm_left_joint4" range="0 2.4435" actuatorfrcrange="-27 27" armature="0.01" damping="1" axis="0 -1 0"/>
+              <geom name="openarm_left_link4_visual" type="mesh" contype="0" conaffinity="0" group="1" rgba="0.55 0.6 0.68 1" density="0" mesh="robot__openarm_v2.0__arm__visual__link4"/>
+              <geom name="openarm_left_link4_collision" type="mesh" group="3" mesh="robot__openarm_v2.0__arm__collision__link4"/>
+              <body name="openarm_left_link5" pos="0 0 -0.0955" gravcomp="1">
+                <inertial pos="-0.000737189 0.000412407 -0.0470938" quat="0.685547 -0.0023482 -0.00297125 0.728019" mass="0.615659" diaginertia="0.000334799 0.00027946 0.000176657"/>
+                <joint name="openarm_left_joint5" range="-1.5708 1.5708" actuatorfrcrange="-7 7" armature="0.01" damping="1" axis="0 0 -1"/>
+                <geom name="openarm_left_link5_visual" quat="1 0 0 0" type="mesh" contype="0" conaffinity="0" group="1" rgba="0.55 0.6 0.68 1" density="0" mesh="robot__openarm_v2.0__arm__visual__link5"/>
+                <geom name="openarm_left_link5_collision" type="mesh" group="3" mesh="robot__openarm_v2.0__arm__collision__link5"/>
+                <body name="openarm_left_link6" pos="0 0 -0.1205" gravcomp="1">
+                  <inertial pos="2.27438e-05 -0.000686496 5.44e-05" quat="0.999832 -0.0183155 0.000396998 -0.000757678" mass="0.475203" diaginertia="0.000179276 0.000136249 0.000135339"/>
+                  <joint name="openarm_left_joint6" range="-0.7854 0.7854" actuatorfrcrange="-7 7" armature="0.01" damping="1" axis="0 -1 0"/>
+                  <geom name="openarm_left_link6_visual" quat="1 0 0 0" type="mesh" contype="0" conaffinity="0" group="1" rgba="0.55 0.6 0.68 1" density="0" mesh="robot__openarm_v2.0__arm__visual__link6"/>
+                  <geom name="openarm_left_link6_collision" quat="1 0 0 0" type="mesh" group="3" mesh="robot__openarm_v2.0__arm__collision__link6"/>
+                  <body name="openarm_left_ee_base_link" gravcomp="1">
+                    <inertial pos="0.0137902 -0.0084073 -0.05938" quat="0.760121 0.648846 -0.0304586 -0.0169319" mass="0.52832" diaginertia="0.000219417 0.000166122 0.000155742"/>
+                    <joint name="openarm_left_joint7" range="-1.5708 1.5708" actuatorfrcrange="-7 7" armature="0.01" damping="1" axis="1 0 0"/>
+                    <geom name="openarm_left_ee_base_link_visual" pos="0.0205 0 0" quat="1 0 0 0" type="mesh" contype="0" conaffinity="0" group="1" rgba="0.55 0.6 0.68 1" density="0" mesh="end_effector__pinch_gripper__visual__ee_base_link"/>
+                    <geom name="openarm_left_ee_base_link_collision" pos="0.0205 0 0" quat="1 0 0 0" type="mesh" group="3" mesh="end_effector__pinch_gripper__collision__ee_base_link"/>
+                    <!-- IK target site: Tool Centre Point (TCP) at the gripper fingertip midpoint -->
+                    <site name="left_ee_site" pos="-0.00143 0 -0.093" size="0.008" rgba="0 1 0 0.5" group="4"/>
+                    <body name="openarm_left_ee_link1" pos="-0.00143 -0.018 -0.068" gravcomp="1">
+                      <inertial pos="-0.0124991 -0.00176593 -0.0241663" quat="0.982638 0.0922083 -0.15927 -0.0235192" mass="0.125979" diaginertia="3.8543e-05 3.6883e-05 1.43942e-05"/>
+                      <joint name="openarm_left_finger_joint1" range="0 0.7854" actuatorfrcrange="-7 7" armature="0.01" damping="1" axis="-1 0 0"/>
+                      <geom name="openarm_left_ee_link1_visual" pos="0 0 0" quat="1 0 0 0" type="mesh" contype="0" conaffinity="0" group="1" rgba="0.55 0.6 0.68 1" density="0" mesh="end_effector__pinch_gripper__visual__finger_inner"/>
+                      <geom name="openarm_left_ee_link1_collision" quat="1 0 0 0" type="mesh" group="3" mesh="end_effector__pinch_gripper__collision__finger_inner"/>
+                    </body>
+                    <body name="openarm_left_ee_link2" pos="-0.00143 0.018 -0.068" gravcomp="1">
+                      <inertial pos="-0.012796 0.0020183 -0.026792" quat="0.982097 -0.0906989 -0.165079 0.00294113" mass="0.11372" diaginertia="3.70662e-05 3.60159e-05 1.33599e-05"/>
+                      <joint name="openarm_left_finger_joint2" range="0 0.7854" actuatorfrcrange="-7 7" armature="0.01" damping="1" axis="1 0 0"/>
+                      <geom name="openarm_left_ee_link2_visual" quat="1 0 0 0" type="mesh" contype="0" conaffinity="0" group="1" rgba="0.55 0.6 0.68 1" density="0" mesh="end_effector__pinch_gripper__visual__finger_outer"/>
+                      <geom name="openarm_left_ee_link2_collision" quat="1 0 0 0" type="mesh" group="3" mesh="end_effector__pinch_gripper__collision__finger_outer"/>
+                    </body>
+                    <!-- ===== Sensor 1: In-Hand Camera (Vision Sensor) ===== -->
+                    <!-- Embedded inside the gripper casing, provides first-person POV -->
+                    <!-- during grasping. Finger geometry minimizes blind spots. -->
+                    <camera name="openarm_left_in_hand_camera"
+                            pos="0.0218353 0.024136 -0.086895"
+                            quat="0.612077 -0.113467 0.76951 -0.142622"
+                            fovy="60" resolution="640 480"/>
+                    <frame pos="0.0218353 0.024136 -0.086895" quat="0.612077 -0.113467 0.76951 -0.142622"/>
+                  </body>
+                </body>
+              </body>
+            </body>
+          </body>
+        </body>
+      </body>
+    </frame>
+    <frame pos="0 -0.03 0.697">
+      <geom name="openarm_right_base_link_visual" quat="1 0 0 0" type="mesh" contype="0" conaffinity="0" group="1" rgba="0.55 0.6 0.68 1" density="0" mesh="robot__openarm_v2.0__arm__visual__base_link1"/>
+      <geom name="openarm_right_base_link_collision" quat="1 0 0 0" type="mesh" group="3" mesh="robot__openarm_v2.0__arm__collision__base_link1"/>
+      <body name="openarm_right_link1" pos="0 -0.0625 0" gravcomp="1">
+        <inertial pos="0.00090035 -0.044466 2.88441e-05" quat="0.999901 0.000371041 -5.04627e-05 0.0140339" mass="1.14167" diaginertia="0.00109459 0.000758935 0.000670659"/>
+        <joint name="openarm_right_joint1" range="-1.3963 3.4907" actuatorfrcrange="-40 40" armature="0.01" damping="1" axis="0 -1 0"/>
+        <geom name="openarm_right_link1_visual" quat="1 0 0 0" type="mesh" contype="0" conaffinity="0" group="1" rgba="0.55 0.6 0.68 1" density="0" mesh="robot__openarm_v2.0__arm__visual__link11"/>
+        <geom name="openarm_right_link1_collision" quat="1 0 0 0" type="mesh" group="3" mesh="robot__openarm_v2.0__arm__collision__link11"/>
+        <body name="openarm_right_link2" pos="0 -0.06 0" gravcomp="1">
+          <inertial pos="-0.0247185 7.60578e-08 -0.0312643" quat="0.999342 6.47495e-06 -0.0362804 -3.02331e-06" mass="0.277509" diaginertia="0.000153968 0.000113062 8.19211e-05"/>
+          <joint name="openarm_right_joint2" range="-0.17453 3.3161" actuatorfrcrange="-40 40" armature="0.01" damping="1" axis="-1 0 0"/>
+          <geom name="openarm_right_link2_visual" quat="1 0 0 0" type="mesh" contype="0" conaffinity="0" group="1" rgba="0.55 0.6 0.68 1" density="0" mesh="robot__openarm_v2.0__arm__visual__link21"/>
+          <geom name="openarm_right_link2_collision" type="mesh" group="3" mesh="robot__openarm_v2.0__arm__collision__link21"/>
+          <body name="openarm_right_link3" pos="0 0 -0.06625" gravcomp="1">
+            <inertial pos="-0.00300862 -0.000514813 -0.109368" quat="0.998906 -0.00891354 0.0458105 0.00280505" mass="1.07386" diaginertia="0.00129561 0.00114038 0.000553361"/>
+            <joint name="openarm_right_joint3" range="-1.5708 1.5708" actuatorfrcrange="-27 27" armature="0.01" damping="1" axis="0 0 -1"/>
+            <geom name="openarm_right_link3_visual" quat="1 0 0 0" type="mesh" contype="0" conaffinity="0" group="1" rgba="0.55 0.6 0.68 1" density="0" mesh="robot__openarm_v2.0__arm__visual__link3"/>
+            <geom name="openarm_right_link3_collision" quat="1 0 0 0" type="mesh" group="3" mesh="robot__openarm_v2.0__arm__collision__link3"/>
+            <body name="openarm_right_link4" pos="0 0 -0.15375" gravcomp="1">
+              <inertial pos="-0.00310326 -0.00136539 -0.0574601" quat="0.996953 0.00947291 0.00348081 0.0773554" mass="0.634853" diaginertia="0.000469894 0.000433114 0.000245134"/>
+              <joint name="openarm_right_joint4" range="0 2.4435" actuatorfrcrange="-27 27" armature="0.01" damping="1" axis="0 -1 0"/>
+              <geom name="openarm_right_link4_visual" type="mesh" contype="0" conaffinity="0" group="1" rgba="0.55 0.6 0.68 1" density="0" mesh="robot__openarm_v2.0__arm__visual__link4"/>
+              <geom name="openarm_right_link4_collision" type="mesh" group="3" mesh="robot__openarm_v2.0__arm__collision__link4"/>
+              <body name="openarm_right_link5" pos="0 0 -0.0955" gravcomp="1">
+                <inertial pos="-0.000737189 -0.000412407 -0.0470938" quat="0.728019 -0.00297125 -0.0023482 0.685547" mass="0.615659" diaginertia="0.000334799 0.00027946 0.000176657"/>
+                <joint name="openarm_right_joint5" range="-1.5708 1.5708" actuatorfrcrange="-7 7" armature="0.01" damping="1" axis="0 0 -1"/>
+                <geom name="openarm_right_link5_visual" quat="1 0 0 0" type="mesh" contype="0" conaffinity="0" group="1" rgba="0.55 0.6 0.68 1" density="0" mesh="robot__openarm_v2.0__arm__visual__link51"/>
+                <geom name="openarm_right_link5_collision" type="mesh" group="3" mesh="robot__openarm_v2.0__arm__collision__link51"/>
+                <body name="openarm_right_link6" pos="0 0 -0.1205" gravcomp="1">
+                  <inertial pos="2.27438e-05 0.000686496 5.44e-05" quat="0.999832 0.0183155 0.000396998 0.000757678" mass="0.475203" diaginertia="0.000179276 0.000136249 0.000135339"/>
+                  <joint name="openarm_right_joint6" range="-0.7854 0.7854" actuatorfrcrange="-7 7" armature="0.01" damping="1" axis="0 1 0"/>
+                  <geom name="openarm_right_link6_visual" quat="1 0 0 0" type="mesh" contype="0" conaffinity="0" group="1" rgba="0.55 0.6 0.68 1" density="0" mesh="robot__openarm_v2.0__arm__visual__link61"/>
+                  <geom name="openarm_right_link6_collision" quat="1 0 0 0" type="mesh" group="3" mesh="robot__openarm_v2.0__arm__collision__link61"/>
+                  <body name="openarm_right_ee_base_link" gravcomp="1">
+                    <inertial pos="0.0137902 0.0084073 -0.05938" quat="0.648846 0.760121 0.0169319 0.0304586" mass="0.52832" diaginertia="0.000219417 0.000166122 0.000155742"/>
+                    <joint name="openarm_right_joint7" range="-1.5708 1.5708" actuatorfrcrange="-7 7" armature="0.01" damping="1" axis="1 0 0"/>
+                    <geom name="openarm_right_ee_base_link_visual" pos="0.0205 0 0" quat="1 0 0 0" type="mesh" contype="0" conaffinity="0" group="1" rgba="0.55 0.6 0.68 1" density="0" mesh="end_effector__pinch_gripper__visual__ee_base_link1"/>
+                    <geom name="openarm_right_ee_base_link_collision" pos="0.0205 0 0" quat="1 0 0 0" type="mesh" group="3" mesh="end_effector__pinch_gripper__collision__ee_base_link1"/>
+                    <!-- IK target site: Tool Centre Point (TCP) at the gripper fingertip midpoint -->
+                    <site name="right_ee_site" pos="-0.00143 0 -0.093" size="0.008" rgba="0 1 0 0.5" group="4"/>
+                    <body name="openarm_right_ee_link1" pos="-0.00143 0.018 -0.068" gravcomp="1">
+                      <inertial pos="-0.0124991 0.00176593 -0.0241663" quat="0.982638 -0.0922083 -0.15927 0.0235192" mass="0.125979" diaginertia="3.8543e-05 3.6883e-05 1.43942e-05"/>
+                      <joint name="openarm_right_finger_joint1" range="-0.7854 0" actuatorfrcrange="-7 7" armature="0.01" damping="1" axis="-1 0 0"/>
+                      <geom name="openarm_right_ee_link1_visual" quat="1 0 0 0" type="mesh" contype="0" conaffinity="0" group="1" rgba="0.55 0.6 0.68 1" density="0" mesh="end_effector__pinch_gripper__visual__finger_inner1"/>
+                      <geom name="openarm_right_ee_link1_collision" quat="1 0 0 0" type="mesh" group="3" mesh="end_effector__pinch_gripper__collision__finger_inner1"/>
+                    </body>
+                    <body name="openarm_right_ee_link2" pos="-0.00143 -0.018 -0.068" gravcomp="1">
+                      <inertial pos="-0.012796 -0.0020183 -0.026792" quat="0.982097 0.0906989 -0.165079 -0.00294113" mass="0.11372" diaginertia="3.70662e-05 3.60159e-05 1.33599e-05"/>
+                      <joint name="openarm_right_finger_joint2" range="-0.7854 0" actuatorfrcrange="-7 7" armature="0.01" damping="1" axis="1 0 0"/>
+                      <geom name="openarm_right_ee_link2_visual" quat="1 0 0 0" type="mesh" contype="0" conaffinity="0" group="1" rgba="0.55 0.6 0.68 1" density="0" mesh="end_effector__pinch_gripper__visual__finger_outer1"/>
+                      <geom name="openarm_right_ee_link2_collision" quat="1 0 0 0" type="mesh" group="3" mesh="end_effector__pinch_gripper__collision__finger_outer1"/>
+                    </body>
+                    <!-- ===== Sensor 1: In-Hand Camera (Vision Sensor) ===== -->
+                    <!-- Embedded inside the gripper casing, provides first-person POV -->
+                    <!-- during grasping. Finger geometry minimizes blind spots. -->
+                    <camera name="openarm_right_in_hand_camera"
+                            pos="0.0218353 -0.024136 -0.086895"
+                            quat="0.612077 0.113467 0.76951 0.142622"
+                            fovy="60" resolution="640 480"/>
+                    <frame pos="0.0218353 -0.024136 -0.086895" quat="0.612077 0.113467 0.76951 0.142622"/>
+                  </body>
+                </body>
+              </body>
+            </body>
+          </body>
+        </body>
+      </body>
+    </frame>
+  </worldbody>
+
+  <equality>
+    <joint joint1="openarm_left_finger_joint2" joint2="openarm_left_finger_joint1"/>
+    <joint joint1="openarm_right_finger_joint2" joint2="openarm_right_finger_joint1"/>
+  </equality>
+
+  <actuator>
+    <general name="openarm_left_joint1" joint="openarm_left_joint1" ctrlrange="-3.4907 1.3963" ctrllimited="true" forcelimited="true" forcerange="-40 40" biastype="affine" gainprm="80" biasprm="0 -80 -8"/>
+    <general name="openarm_left_joint2" joint="openarm_left_joint2" ctrlrange="-3.3161 0.17453" ctrllimited="true" forcelimited="true" forcerange="-40 40" biastype="affine" gainprm="80" biasprm="0 -80 -8"/>
+    <general name="openarm_left_joint3" joint="openarm_left_joint3" ctrlrange="-1.5708 1.5708" ctrllimited="true" forcelimited="true" forcerange="-27 27" biastype="affine" gainprm="54" biasprm="0 -54 -5.4"/>
+    <general name="openarm_left_joint4" joint="openarm_left_joint4" ctrlrange="0 2.4435" ctrllimited="true" forcelimited="true" forcerange="-27 27" biastype="affine" gainprm="54" biasprm="0 -54 -5.4"/>
+    <general name="openarm_left_joint5" joint="openarm_left_joint5" ctrlrange="-1.5708 1.5708" ctrllimited="true" forcelimited="true" forcerange="-7 7" biastype="affine" gainprm="14" biasprm="0 -14 -1.4"/>
+    <general name="openarm_left_joint6" joint="openarm_left_joint6" ctrlrange="-0.7854 0.7854" ctrllimited="true" forcelimited="true" forcerange="-7 7" biastype="affine" gainprm="14" biasprm="0 -14 -1.4"/>
+    <general name="openarm_left_joint7" joint="openarm_left_joint7" ctrlrange="-1.5708 1.5708" ctrllimited="true" forcelimited="true" forcerange="-7 7" biastype="affine" gainprm="14" biasprm="0 -14 -1.4"/>
+    <general name="openarm_left_finger_joint1" joint="openarm_left_finger_joint1" ctrlrange="0 0.7854" ctrllimited="true" forcelimited="true" forcerange="-7 7" biastype="affine" gainprm="14" biasprm="0 -14 -1.4"/>
+    <general name="openarm_right_joint1" joint="openarm_right_joint1" ctrlrange="-1.3963 3.4907" ctrllimited="true" forcelimited="true" forcerange="-40 40" biastype="affine" gainprm="80" biasprm="0 -80 -8"/>
+    <general name="openarm_right_joint2" joint="openarm_right_joint2" ctrlrange="-0.17453 3.3161" ctrllimited="true" forcelimited="true" forcerange="-40 40" biastype="affine" gainprm="80" biasprm="0 -80 -8"/>
+    <general name="openarm_right_joint3" joint="openarm_right_joint3" ctrlrange="-1.5708 1.5708" ctrllimited="true" forcelimited="true" forcerange="-27 27" biastype="affine" gainprm="54" biasprm="0 -54 -5.4"/>
+    <general name="openarm_right_joint4" joint="openarm_right_joint4" ctrlrange="0 2.4435" ctrllimited="true" forcelimited="true" forcerange="-27 27" biastype="affine" gainprm="54" biasprm="0 -54 -5.4"/>
+    <general name="openarm_right_joint5" joint="openarm_right_joint5" ctrlrange="-1.5708 1.5708" ctrllimited="true" forcelimited="true" forcerange="-7 7" biastype="affine" gainprm="14" biasprm="0 -14 -1.4"/>
+    <general name="openarm_right_joint6" joint="openarm_right_joint6" ctrlrange="-0.7854 0.7854" ctrllimited="true" forcelimited="true" forcerange="-7 7" biastype="affine" gainprm="14" biasprm="0 -14 -1.4"/>
+    <general name="openarm_right_joint7" joint="openarm_right_joint7" ctrlrange="-1.5708 1.5708" ctrllimited="true" forcelimited="true" forcerange="-7 7" biastype="affine" gainprm="14" biasprm="0 -14 -1.4"/>
+    <general name="openarm_right_finger_joint1" joint="openarm_right_finger_joint1" ctrlrange="-0.7854 0" ctrllimited="true" forcelimited="true" forcerange="-7 7" biastype="affine" gainprm="14" biasprm="0 -14 -1.4"/>
+  </actuator>
+
+  <!-- =================================================================== -->
+  <!-- SENSOR DEFINITIONS                                                  -->
+  <!-- =================================================================== -->
+  <sensor>
+    <!-- ================================================================= -->
+    <!-- Sensor 2: Motor Encoders  (Position & Velocity)                   -->
+    <!-- Embedded inside each Damiao QDD actuator.                         -->
+    <!-- Fed back at 9 kHz over the CAN-FD control bus.                    -->
+    <!-- ================================================================= -->
+
+    <!-- Left Arm — Joint Position Encoders -->
+    <jointpos name="left_encoder_pos_shoulder_pan"  joint="openarm_left_joint1"/>  <!-- Shoulder Pan -->
+    <jointpos name="left_encoder_pos_shoulder_lift" joint="openarm_left_joint2"/>  <!-- Shoulder Lift -->
+    <jointpos name="left_encoder_pos_shoulder_rot"  joint="openarm_left_joint3"/>  <!-- Shoulder Rotation -->
+    <jointpos name="left_encoder_pos_elbow_flex"    joint="openarm_left_joint4"/>  <!-- Elbow Flex -->
+    <jointpos name="left_encoder_pos_wrist_roll"    joint="openarm_left_joint5"/>  <!-- Wrist Roll -->
+    <jointpos name="left_encoder_pos_wrist_pitch"   joint="openarm_left_joint6"/>  <!-- Wrist Pitch -->
+    <jointpos name="left_encoder_pos_wrist_rot"     joint="openarm_left_joint7"/>  <!-- Wrist Rotation -->
+    <jointpos name="left_encoder_pos_gripper"       joint="openarm_left_finger_joint1"/>  <!-- Gripper -->
+
+    <!-- Left Arm — Joint Velocity Encoders -->
+    <jointvel name="left_encoder_vel_shoulder_pan"  joint="openarm_left_joint1"/>
+    <jointvel name="left_encoder_vel_shoulder_lift" joint="openarm_left_joint2"/>
+    <jointvel name="left_encoder_vel_shoulder_rot"  joint="openarm_left_joint3"/>
+    <jointvel name="left_encoder_vel_elbow_flex"    joint="openarm_left_joint4"/>
+    <jointvel name="left_encoder_vel_wrist_roll"    joint="openarm_left_joint5"/>
+    <jointvel name="left_encoder_vel_wrist_pitch"   joint="openarm_left_joint6"/>
+    <jointvel name="left_encoder_vel_wrist_rot"     joint="openarm_left_joint7"/>
+    <jointvel name="left_encoder_vel_gripper"       joint="openarm_left_finger_joint1"/>
+
+    <!-- Right Arm — Joint Position Encoders -->
+    <jointpos name="right_encoder_pos_shoulder_pan"  joint="openarm_right_joint1"/>
+    <jointpos name="right_encoder_pos_shoulder_lift" joint="openarm_right_joint2"/>
+    <jointpos name="right_encoder_pos_shoulder_rot"  joint="openarm_right_joint3"/>
+    <jointpos name="right_encoder_pos_elbow_flex"    joint="openarm_right_joint4"/>
+    <jointpos name="right_encoder_pos_wrist_roll"    joint="openarm_right_joint5"/>
+    <jointpos name="right_encoder_pos_wrist_pitch"   joint="openarm_right_joint6"/>
+    <jointpos name="right_encoder_pos_wrist_rot"     joint="openarm_right_joint7"/>
+    <jointpos name="right_encoder_pos_gripper"       joint="openarm_right_finger_joint1"/>
+
+    <!-- Right Arm — Joint Velocity Encoders -->
+    <jointvel name="right_encoder_vel_shoulder_pan"  joint="openarm_right_joint1"/>
+    <jointvel name="right_encoder_vel_shoulder_lift" joint="openarm_right_joint2"/>
+    <jointvel name="right_encoder_vel_shoulder_rot"  joint="openarm_right_joint3"/>
+    <jointvel name="right_encoder_vel_elbow_flex"    joint="openarm_right_joint4"/>
+    <jointvel name="right_encoder_vel_wrist_roll"    joint="openarm_right_joint5"/>
+    <jointvel name="right_encoder_vel_wrist_pitch"   joint="openarm_right_joint6"/>
+    <jointvel name="right_encoder_vel_wrist_rot"     joint="openarm_right_joint7"/>
+    <jointvel name="right_encoder_vel_gripper"       joint="openarm_right_finger_joint1"/>
+
+    <!-- ================================================================= -->
+    <!-- Sensor 3: Current / Torque Feedback  (Bilateral Force Sensing)    -->
+    <!-- Built into the QDD actuators. Measures motor current to estimate  -->
+    <!-- external forces for bilateral teleoperation & gravity comp.       -->
+    <!-- ================================================================= -->
+
+    <!-- Left Arm — Actuator Torque / Current Feedback -->
+    <actuatorfrc name="left_torque_shoulder_pan"  actuator="openarm_left_joint1"/>
+    <actuatorfrc name="left_torque_shoulder_lift" actuator="openarm_left_joint2"/>
+    <actuatorfrc name="left_torque_shoulder_rot"  actuator="openarm_left_joint3"/>
+    <actuatorfrc name="left_torque_elbow_flex"    actuator="openarm_left_joint4"/>
+    <actuatorfrc name="left_torque_wrist_roll"    actuator="openarm_left_joint5"/>
+    <actuatorfrc name="left_torque_wrist_pitch"   actuator="openarm_left_joint6"/>
+    <actuatorfrc name="left_torque_wrist_rot"     actuator="openarm_left_joint7"/>
+    <actuatorfrc name="left_torque_gripper"       actuator="openarm_left_finger_joint1"/>
+
+    <!-- Right Arm — Actuator Torque / Current Feedback -->
+    <actuatorfrc name="right_torque_shoulder_pan"  actuator="openarm_right_joint1"/>
+    <actuatorfrc name="right_torque_shoulder_lift" actuator="openarm_right_joint2"/>
+    <actuatorfrc name="right_torque_shoulder_rot"  actuator="openarm_right_joint3"/>
+    <actuatorfrc name="right_torque_elbow_flex"    actuator="openarm_right_joint4"/>
+    <actuatorfrc name="right_torque_wrist_roll"    actuator="openarm_right_joint5"/>
+    <actuatorfrc name="right_torque_wrist_pitch"   actuator="openarm_right_joint6"/>
+    <actuatorfrc name="right_torque_wrist_rot"     actuator="openarm_right_joint7"/>
+    <actuatorfrc name="right_torque_gripper"       actuator="openarm_right_finger_joint1"/>
+
+    <!-- ================================================================= -->
+    <!-- Sensor 4: Area Sensors / Light Curtains  (Safety)                 -->
+    <!-- Rangefinder beams cast from the cell boundary inward.             -->
+    <!-- Detects workspace intrusion → triggers reach-in stop.             -->
+    <!-- ================================================================= -->
+    <rangefinder name="safety_rangefinder_front" site="safety_curtain_front"/>
+    <rangefinder name="safety_rangefinder_back"  site="safety_curtain_back"/>
+    <rangefinder name="safety_rangefinder_left"  site="safety_curtain_left"/>
+    <rangefinder name="safety_rangefinder_right" site="safety_curtain_right"/>
+  </sensor>
+</mujoco>

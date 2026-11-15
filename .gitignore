@@ -1,0 +1,25 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# PyTorch checkpoints and training logs (optional: comment out if you want to track pre-trained weights)
+*.pt
+*.pth
+runs/
+checkpoints/
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# IDE and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# MuJoCo output / logs
+mj_out/
+*.log
