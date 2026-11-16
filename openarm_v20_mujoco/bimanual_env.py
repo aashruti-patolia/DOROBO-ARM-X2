@@ -253,6 +253,31 @@ class BimanualPickPlaceEnv(gym.Env):
                 elif "right" in gname and any(k in gname for k in ["openarm", "finger", "ee_"]):
                     self._right_arm_geom_ids.add(i)
 
+        # Boolean per-geom lookup tables so contact tests are vectorised
+        # (one pass over data.contact.geom instead of a Python loop).
+        self._box_geom_mask = np.zeros(m.ngeom, dtype=bool)
+        self._box_geom_mask[list(self._box_geom_ids)] = True
+        self._arm_geom_mask = {}
+        for side, ids in (("left", self._left_arm_geom_ids),
+                          ("right", self._right_arm_geom_ids)):
+            mask = np.zeros(m.ngeom, dtype=bool)
+            mask[list(ids)] = True
+            self._arm_geom_mask[side] = mask
+
+        # Finger collision geoms per arm (resolved once, not every step)
+        self._finger_geom_ids = {
+            side: tuple(
+                mujoco.mj_name2id(
+                    m, mujoco.mjtObj.mjOBJ_GEOM,
+                    f"openarm_{side}_ee_link{k}_collision")
+                for k in (1, 2)
+            )
+            for side in ("left", "right")
+        }
+
+        # Box body id (ball id is stored above) for direct xpos indexing
+        self._box_body_id = box_bid
+
         # DoF addresses for velocity readout
         self._left_dof_adr = self.ik._left_dof_adr
         self._right_dof_adr = self.ik._right_dof_adr
@@ -361,7 +386,8 @@ class BimanualPickPlaceEnv(gym.Env):
             corrected_quat = _apply_rotation_residual(ik_target_quat, delta_orient)
 
         # ---- 3. Solve IK and execute ----
-        self.ik.sync_from(self.data)
+        # (the solver recomputes kinematics itself, so skip it in the sync)
+        self.ik.sync_from(self.data, forward=False)
         if self._active_arm == "left":
             ik_result = self.ik.solve_left(
                 target_pos=corrected_pos, target_quat=corrected_quat,
@@ -393,14 +419,15 @@ class BimanualPickPlaceEnv(gym.Env):
 
         # ---- 4. Read state after physics ----
         ee_pos, ee_quat = self._get_ee_state()
-        ball_pos = self.data.body("ball").xpos.copy()
+        ball_pos = self.data.xpos[self._ball_body_id].copy()
         ball_vel = self.data.qvel[self._ball_dof_adr:self._ball_dof_adr + 6].copy()
-        box_pos = self.data.body("box").xpos.copy()
+        box_pos = self.data.xpos[self._box_body_id].copy()
 
-        # Check contacts
+        # Check contacts (each computed once per step and reused below)
         finger_contacts = self._check_finger_ball_contacts()
         arm_basket_contact = self._check_arm_box_contact()
-        basket_clearance = self._compute_basket_clearance()
+        basket_clearance = self._compute_basket_clearance(
+            ee_pos=ee_pos, arm_box_contact=arm_basket_contact)
 
         # Ball in box check
         ball_in_box = self._check_ball_in_box(ball_pos, box_pos)
@@ -460,7 +487,10 @@ class BimanualPickPlaceEnv(gym.Env):
         if ball_pos[2] < TABLE_Z - 0.05:
             truncated = True
 
-        obs = self._get_obs()
+        # Nothing has touched the simulation since the readout above, so the
+        # observation reuses it instead of recomputing EE state and contacts.
+        obs = self._get_obs(ee_state=(ee_pos, ee_quat),
+                            basket_clearance=basket_clearance)
         info = {
             "active_arm": self._active_arm,
             "phase": PHASE_NAMES[self._phase],
@@ -499,8 +529,12 @@ class BimanualPickPlaceEnv(gym.Env):
     # Observation construction
     # =================================================================
 
-    def _get_obs(self) -> np.ndarray:
-        """Build the full observation vector."""
+    def _get_obs(self, ee_state=None, basket_clearance=None) -> np.ndarray:
+        """Build the full observation vector.
+
+        ``ee_state`` / ``basket_clearance`` may be passed in when the caller
+        has already computed them for the current simulation state.
+        """
         # Skill one-hot
         skill_id = np.zeros(3, dtype=np.float32)
         skill_id[self._phase] = 1.0
@@ -519,19 +553,19 @@ class BimanualPickPlaceEnv(gym.Env):
             joint_pos = self.data.qpos[self._right_qpos_adr].astype(np.float32)
             joint_vel = self.data.qvel[self._right_dof_adr].astype(np.float32)
 
-        ee_pos, ee_quat = self._get_ee_state()
+        ee_pos, ee_quat = ee_state if ee_state is not None else self._get_ee_state()
         gripper_state = np.array([self._gripper_open_ratio], dtype=np.float32)
 
         # Exteroception
-        ball_pos = self.data.body("ball").xpos.copy()
+        ball_pos = self.data.xpos[self._ball_body_id].copy()
         ball_vel = self.data.qvel[self._ball_dof_adr:self._ball_dof_adr + 3].copy()
-        box_pos = self.data.body("box").xpos.copy()
+        box_pos = self.data.xpos[self._box_body_id]
 
         ball_ee_vec = (ball_pos - ee_pos).astype(np.float32)
         ball_basket_vec = (box_pos - ball_pos).astype(np.float32)
-        basket_clearance = np.array(
-            [self._compute_basket_clearance()], dtype=np.float32
-        )
+        if basket_clearance is None:
+            basket_clearance = self._compute_basket_clearance(ee_pos=ee_pos)
+        basket_clearance = np.array([basket_clearance], dtype=np.float32)
 
         # Mirror observations for right arm (flip Y axis so policy sees
         # a canonical "left arm" view, doubling sample efficiency)
@@ -591,8 +625,8 @@ class BimanualPickPlaceEnv(gym.Env):
 
         Returns (target_pos, target_quat) where target_quat may be None.
         """
-        ball_pos = self.data.body("ball").xpos.copy()
-        box_pos = self.data.body("box").xpos.copy()
+        ball_pos = self.data.xpos[self._ball_body_id].copy()
+        box_pos = self.data.xpos[self._box_body_id].copy()
 
         if self._phase == PHASE_APPROACH:
             # Target: just above the ball, descending toward it
@@ -688,67 +722,55 @@ class BimanualPickPlaceEnv(gym.Env):
             mujoco.mju_mat2Quat(quat, self.data.site_xmat[self._right_site_id])
         return pos.astype(np.float32), quat.astype(np.float32)
 
+    def _contact_geoms(self) -> np.ndarray:
+        """Geom-id pairs of the active contacts, shape (ncon, 2)."""
+        return self.data.contact.geom[:self.data.ncon]
+
     def _check_finger_ball_contacts(self) -> tuple[bool, bool]:
         """Check if each finger is in contact with the ball."""
-        finger1_contact = False
-        finger2_contact = False
-
-        if self._active_arm == "left":
-            f1_name = "openarm_left_ee_link1_collision"
-            f2_name = "openarm_left_ee_link2_collision"
-        else:
-            f1_name = "openarm_right_ee_link1_collision"
-            f2_name = "openarm_right_ee_link2_collision"
-
-        f1_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, f1_name)
-        f2_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, f2_name)
-
-        for i in range(self.data.ncon):
-            c = self.data.contact[i]
-            g1, g2 = c.geom1, c.geom2
-            pair = {g1, g2}
-            if self._ball_geom_id in pair:
-                if f1_id in pair:
-                    finger1_contact = True
-                if f2_id in pair:
-                    finger2_contact = True
-
-        return (finger1_contact, finger2_contact)
+        if self.data.ncon == 0:
+            return (False, False)
+        geoms = self._contact_geoms()
+        f1_id, f2_id = self._finger_geom_ids[self._active_arm]
+        with_ball = geoms[(geoms == self._ball_geom_id).any(axis=1)]
+        return (bool((with_ball == f1_id).any()),
+                bool((with_ball == f2_id).any()))
 
     def _check_arm_box_contact(self) -> bool:
         """Check if any arm/gripper geom is in contact with box."""
-        active_geoms = (
-            self._left_arm_geom_ids if self._active_arm == "left"
-            else self._right_arm_geom_ids
-        )
-        for i in range(self.data.ncon):
-            c = self.data.contact[i]
-            g1, g2 = c.geom1, c.geom2
-            if (g1 in active_geoms and g2 in self._box_geom_ids) or \
-               (g2 in active_geoms and g1 in self._box_geom_ids):
-                return True
-        return False
+        if self.data.ncon == 0:
+            return False
+        geoms = self._contact_geoms()
+        g1, g2 = geoms[:, 0], geoms[:, 1]
+        arm = self._arm_geom_mask[self._active_arm]
+        box = self._box_geom_mask
+        return bool(((arm[g1] & box[g2]) | (arm[g2] & box[g1])).any())
 
-    def _compute_basket_clearance(self) -> float:
+    def _compute_basket_clearance(self, ee_pos=None, arm_box_contact=None) -> float:
         """Estimate minimum distance from active arm to basket.
 
         Uses end-effector-to-box-center distance as a proxy.
         For higher fidelity, one would use mj_distanceGeoms or iterate
         contact.dist, but this is fast and sufficient for reward shaping.
+
+        ``ee_pos`` / ``arm_box_contact`` may be passed in when already known
+        for the current simulation state, to avoid recomputing them.
         """
-        ee_pos, _ = self._get_ee_state()
-        box_pos = self.data.body("box").xpos
+        if ee_pos is None:
+            ee_pos, _ = self._get_ee_state()
+        if arm_box_contact is None:
+            arm_box_contact = self._check_arm_box_contact()
+
+        # Actual contact means zero clearance
+        if arm_box_contact:
+            return 0.0
+
+        box_pos = self.data.xpos[self._box_body_id]
         # Distance from EE to nearest box wall edge (approximate)
         dx = max(0.0, abs(ee_pos[0] - box_pos[0]) - BOX_HALF_SIZE)
         dy = max(0.0, abs(ee_pos[1] - box_pos[1]) - BOX_HALF_SIZE)
         dz = max(0.0, ee_pos[2] - (box_pos[2] + BOX_DEPTH))
-        clearance = np.sqrt(dx * dx + dy * dy + dz * dz)
-
-        # Also check actual contacts for zero clearance
-        if self._check_arm_box_contact():
-            clearance = 0.0
-
-        return float(clearance)
+        return float(np.sqrt(dx * dx + dy * dy + dz * dz))
 
     def _check_ball_in_box(self, ball_pos, box_pos) -> bool:
         """Check if ball is inside the box aperture."""

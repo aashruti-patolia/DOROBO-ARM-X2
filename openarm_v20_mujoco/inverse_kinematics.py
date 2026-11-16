@@ -272,10 +272,26 @@ class OpenArmIK:
         self._jacp = np.zeros((3, self.model.nv))
         self._jacr = np.zeros((3, self.model.nv))
 
-    def sync_from(self, sim_data: mujoco.MjData):
-        """Synchronize joint positions from a live simulation data context."""
+    def _fk(self):
+        """Update the kinematic quantities IK needs in the scratch data.
+
+        mj_kinematics gives site poses; mj_comPos gives the subtree CoMs and
+        cdof that mj_jacSite reads. This is all the solver uses, and it is
+        far cheaper than mj_forward (no collision, dynamics or actuation).
+        """
+        mujoco.mj_kinematics(self.model, self.data)
+        mujoco.mj_comPos(self.model, self.data)
+
+    def sync_from(self, sim_data: mujoco.MjData, forward: bool = True):
+        """Synchronize joint positions from a live simulation data context.
+
+        Pass ``forward=False`` when a solve_*() call follows immediately:
+        the solver recomputes kinematics itself, so the update here would
+        be thrown away.
+        """
         self.data.qpos[:] = sim_data.qpos[:]
-        mujoco.mj_forward(self.model, self.data)
+        if forward:
+            self._fk()
 
     def sync_to(self, sim_data: mujoco.MjData):
         """Copy solved joint positions back to a live simulation data context."""
@@ -342,7 +358,7 @@ class OpenArmIK:
             q_right = np.asarray(q_right, dtype=np.float64)
             self.data.qpos[self._right_qpos_adr] = q_right
 
-        mujoco.mj_forward(self.model, self.data)
+        self._fk()
 
         result = {}
         if q_left is not None:
@@ -419,18 +435,29 @@ class OpenArmIK:
 
         # Initialise joint configuration for this arm only.
         # Other arm and torso/finger joints remain undisturbed.
-        if q_init is not None:
-            self.data.qpos[qpos_adr] = _clamp_joint_angles(
-                np.asarray(q_init, dtype=np.float64),
-                jnt_lower, jnt_upper, jnt_limited, cfg.joint_limit_margin)
-        else:
-            self.data.qpos[qpos_adr] = _clamp_joint_angles(
-                home_pose, jnt_lower, jnt_upper, jnt_limited, cfg.joint_limit_margin)
+        # Clamp bounds are constant for the whole solve; build them once.
+        q_lo = np.where(jnt_limited, jnt_lower + cfg.joint_limit_margin, -np.inf)
+        q_hi = np.where(jnt_limited, jnt_upper - cfg.joint_limit_margin, np.inf)
+
+        q_start = (np.asarray(q_init, dtype=np.float64)
+                   if q_init is not None else home_pose)
+
+        # Views into the scratch MjData, fetched once: each attribute access
+        # on MjData builds a fresh array wrapper, which adds up inside the
+        # loop. The underlying buffers do not move, so the views stay live.
+        qpos = self.data.qpos
+        site_pos = self.data.site_xpos[site_id]
+
+        q = np.clip(q_start, q_lo, q_hi)
+        qpos[qpos_adr] = q
 
         # Zero out velocities in scratch data
         self.data.qvel[:] = 0.0
 
-        mujoco.mj_forward(self.model, self.data)
+        self._fk()
+
+        lam2 = cfg.damping ** 2
+        w = cfg.nullspace_weight
 
         converged = False
         iterations = 0
@@ -440,18 +467,11 @@ class OpenArmIK:
         for it in range(cfg.max_iterations):
             iterations = it + 1
 
-            # Current end-effector state
-            ee_pos = self.data.site_xpos[site_id].copy()
-            ee_mat = self.data.site_xmat[site_id].copy()
-            ee_quat = np.zeros(4)
-            mujoco.mju_mat2Quat(ee_quat, ee_mat)
-
             # Compute task-space error
-            pos_err = target_pos - ee_pos
-            pos_err_norm = np.linalg.norm(pos_err)
+            pos_err = target_pos - site_pos
+            pos_err_norm = float(np.sqrt(pos_err.dot(pos_err)))
 
             if position_only:
-                dx = pos_err.copy()
                 rot_err_norm = 0.0
 
                 # Check convergence
@@ -460,11 +480,15 @@ class OpenArmIK:
                     break
 
                 # Limit step size
-                dx = _limit_step(dx, cfg.max_linear_step, cfg.max_angular_step)
+                dx = pos_err
+                if pos_err_norm > cfg.max_linear_step:
+                    dx = pos_err * (cfg.max_linear_step / pos_err_norm)
 
                 # Get position-only Jacobian (3 × 7)
                 J = self._get_arm_jacobian(site_id, dof_adr, position_only=True)
             else:
+                ee_quat = np.zeros(4)
+                mujoco.mju_mat2Quat(ee_quat, self.data.site_xmat[site_id])
                 rot_err = _quat_error(target_quat, ee_quat)
                 rot_err_norm = np.linalg.norm(rot_err)
                 dx = np.concatenate([pos_err, rot_err])
@@ -481,36 +505,31 @@ class OpenArmIK:
                 J = self._get_arm_jacobian(site_id, dof_adr, position_only=False)
 
             # Damped Least-Squares: dq = J^T (J J^T + λ² I)^{-1} dx
-            n_task = J.shape[0]
-            JJT = J @ J.T + (cfg.damping ** 2) * np.eye(n_task)
-            dq = J.T @ np.linalg.solve(JJT, dx)
+            # plus a nullspace posture bias w * N p, with N = I - J^+ J and
+            # J^+ = J^T (JJ^T + λ²I)^{-1}.  Expanding N p = p - J^+ (J p)
+            # lets both terms share one solve of the damped system with two
+            # right-hand sides, instead of forming J^+ and N explicitly:
+            #   dq = J^T (JJ^T + λ²I)^{-1} (dx - w J p) + w p
+            JJT = J @ J.T
+            JJT.flat[::JJT.shape[0] + 1] += lam2
+            posture_err = home_pose - q
+            dq = J.T @ np.linalg.solve(JJT, dx - w * (J @ posture_err))
+            dq += w * posture_err
 
-            # Nullspace posture bias (projected into nullspace of J)
-            # N = I - J^+ J,  where J^+ = J^T (JJ^T + λ²I)^{-1}
-            J_pinv = J.T @ np.linalg.solve(JJT, np.eye(n_task))
-            N = np.eye(N_ARM_JOINTS) - J_pinv @ J
-            q_current = self.data.qpos[qpos_adr].copy()
-            posture_err = home_pose - q_current
-            dq += cfg.nullspace_weight * (N @ posture_err)
-
-            # Apply step with line-search scaling
-            q_new = q_current + cfg.step_size * dq
-
-            # Clamp to joint limits (skipping unlimited joints)
-            q_new = _clamp_joint_angles(
-                q_new, jnt_lower, jnt_upper, jnt_limited, cfg.joint_limit_margin)
-
-            # Write back and forward kinematics
-            self.data.qpos[qpos_adr] = q_new
-            mujoco.mj_forward(self.model, self.data)
+            # Apply step with line-search scaling, clamp to joint limits
+            # (unlimited joints have infinite bounds), write back, and
+            # update kinematics.
+            q = np.clip(q + cfg.step_size * dq, q_lo, q_hi)
+            qpos[qpos_adr] = q
+            self._fk()
 
         # Final state
-        ee_pos_final = self.data.site_xpos[site_id].copy()
+        ee_pos_final = site_pos.copy()
         ee_quat_final = np.zeros(4)
         mujoco.mju_mat2Quat(ee_quat_final, self.data.site_xmat[site_id])
 
         return IKResult(
-            q_arm=self.data.qpos[qpos_adr].copy(),
+            q_arm=q.copy(),
             converged=converged,
             iterations=iterations,
             pos_error=pos_err_norm,
@@ -629,7 +648,7 @@ class OpenArmIK:
         # Update both arm solutions in self.data and compute forward kinematics
         self.data.qpos[self._left_qpos_adr] = left_result.q_arm
         self.data.qpos[self._right_qpos_adr] = right_result.q_arm
-        mujoco.mj_forward(self.model, self.data)
+        self._fk()
 
         return BimanualIKResult(
             left=left_result,

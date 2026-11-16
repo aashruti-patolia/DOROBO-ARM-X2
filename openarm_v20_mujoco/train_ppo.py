@@ -93,18 +93,30 @@ class RolloutBuffer:
         self.returns[:self.ptr] = self.advantages[:self.ptr] + self.values[:self.ptr]
 
     def get_batches(self, batch_size: int, device: torch.device):
-        """Yield mini-batch indices for SGD updates."""
-        indices = np.random.permutation(self.ptr)
-        for start in range(0, self.ptr, batch_size):
-            end = min(start + batch_size, self.ptr)
-            batch_idx = indices[start:end]
+        """Yield shuffled mini-batches for SGD updates.
+
+        The rollout is moved to ``device`` once per pass (a zero-copy view
+        on CPU) and mini-batches are sliced from those tensors, rather than
+        building five new tensors from NumPy for every batch.
+        """
+        n = self.ptr
+        obs = torch.as_tensor(self.obs[:n], device=device)
+        actions = torch.as_tensor(self.actions[:n], device=device)
+        log_probs = torch.as_tensor(self.log_probs[:n], device=device)
+        advantages = torch.as_tensor(self.advantages[:n], device=device)
+        returns = torch.as_tensor(self.returns[:n], device=device)
+
+        indices = torch.as_tensor(
+            np.random.permutation(n), dtype=torch.long, device=device)
+        for start in range(0, n, batch_size):
+            batch_idx = indices[start:start + batch_size]
 
             yield (
-                torch.tensor(self.obs[batch_idx], device=device),
-                torch.tensor(self.actions[batch_idx], device=device),
-                torch.tensor(self.log_probs[batch_idx], device=device),
-                torch.tensor(self.advantages[batch_idx], device=device),
-                torch.tensor(self.returns[batch_idx], device=device),
+                obs[batch_idx],
+                actions[batch_idx],
+                log_probs[batch_idx],
+                advantages[batch_idx],
+                returns[batch_idx],
             )
 
     def reset(self):
@@ -256,7 +268,14 @@ def train(args):
         init_log_std=-0.5,
     ).to(device)
 
-    optimizer = optim.Adam(policy.parameters(), lr=args.lr, eps=1e-5)
+    # Fused Adam applies the update for all parameter tensors in one call
+    # instead of a Python loop over ~20 small tensors, which is a large part
+    # of each SGD step for a network this size. Same algorithm; fall back to
+    # the default implementation on torch builds without fused support.
+    try:
+        optimizer = optim.Adam(policy.parameters(), lr=args.lr, eps=1e-5, fused=True)
+    except (RuntimeError, TypeError):
+        optimizer = optim.Adam(policy.parameters(), lr=args.lr, eps=1e-5)
 
     # ---- Rollout buffer ----
     buffer = RolloutBuffer(args.n_steps, obs_dim, action_dim)
@@ -303,13 +322,13 @@ def train(args):
         for step in range(args.n_steps):
             global_step += 1
 
-            with torch.no_grad():
-                obs_t = torch.tensor(obs, dtype=torch.float32, device=device).unsqueeze(0)
+            with torch.inference_mode():
+                obs_t = torch.as_tensor(obs, dtype=torch.float32, device=device).unsqueeze(0)
                 action, log_prob, _, value = policy.get_action_and_value(obs_t)
 
                 action_np = action.squeeze(0).cpu().numpy()
                 log_prob_np = log_prob.item()
-                value_np = value.squeeze().item()
+                value_np = value.item()
 
             # Step environment
             next_obs, reward, terminated, truncated, step_info = env.step(action_np)
@@ -357,9 +376,9 @@ def train(args):
                 break
 
         # ---- Compute GAE ----
-        with torch.no_grad():
-            obs_t = torch.tensor(obs, dtype=torch.float32, device=device).unsqueeze(0)
-            last_value = policy.get_value(obs_t).squeeze().item()
+        with torch.inference_mode():
+            obs_t = torch.as_tensor(obs, dtype=torch.float32, device=device).unsqueeze(0)
+            last_value = policy.get_value(obs_t).item()
 
         buffer.compute_gae(last_value, args.gamma, args.gae_lambda)
 
