@@ -334,6 +334,17 @@ def train(args):
             next_obs, reward, terminated, truncated, step_info = env.step(action_np)
             done = terminated or truncated
 
+            # A truncation (step limit, ball off the table) is not a real
+            # terminal state: the task would have continued. Bootstrap from the
+            # value of the final observation so the critic doesn't learn that
+            # running out of time is worth zero. GAE treats the step as an
+            # episode boundary, so the bootstrap is folded into the reward.
+            if truncated and not terminated:
+                with torch.inference_mode():
+                    final_obs_t = torch.as_tensor(
+                        next_obs, dtype=torch.float32, device=device).unsqueeze(0)
+                    reward += args.gamma * policy.get_value(final_obs_t).item()
+
             buffer.store(obs, action_np, log_prob_np, reward, float(done), value_np)
 
             episode_reward += reward
@@ -341,7 +352,7 @@ def train(args):
 
             if done:
                 episode_rewards.append(episode_reward)
-                episode_successes.append(1.0 if step_info.get("ball_in_box", False) else 0.0)
+                episode_successes.append(1.0 if step_info.get("is_success", False) else 0.0)
                 episode_lengths.append(episode_length)
 
                 # Log episode

@@ -4,16 +4,20 @@ BimanualPickPlaceEnv -- Gymnasium Environment for PPO Training
 
 Residual RL environment for the OpenArm v2.0 bimanual robot.
 The IK solver provides base trajectory targets; the PPO policy outputs
-small residual corrections (delta_pos, delta_orient, gripper_aperture).
+small residual corrections (delta_pos, gripper_aperture).
 
-Observation space (~44 dims):
+Observation space (41 dims):
   skill_id (3)  +  arm_id (2)  +  joint_pos (7)  +  joint_vel (7)  +
   ee_pos (3)  +  ee_quat (4)  +  gripper_state (1)  +
   ball_ee_vec (3)  +  ball_vel (3)  +  ball_basket_vec (3)  +
   basket_clearance (1)  +  prev_action (7)
 
-Action space (7 continuous in [-1, 1]):
-  delta_pos (3)  +  delta_orient (3)  +  gripper (1)
+Action space (4 continuous in [-1, 1]):
+  delta_pos (3)  +  gripper (1)
+
+Actions are expressed in the canonical (left-arm) frame, matching the
+mirrored observations. For the right arm the Y component of delta_pos is
+negated before it is applied in the world frame.
 
 Phase transitions:
   APPROACH(0) -> GRASP(1) -> DROP(2) -> DONE
@@ -69,7 +73,6 @@ WORKSPACE = {
 
 # Residual action scaling
 POS_RESIDUAL_SCALE = 0.015      # Max 15 mm position correction per step
-ORIENT_RESIDUAL_SCALE = 0.10    # Max 0.1 rad orientation correction per step
 GRIPPER_OPEN_MAX = 0.65         # Gripper open angle [rad]
 GRIPPER_CLOSED = 0.05           # Gripper closed angle [rad]
 
@@ -79,6 +82,9 @@ GRASP_LIFT_THRESH = 0.12         # Switch to DROP when ball is lifted 120mm abov
 DROP_RELEASE_THRESH = 0.025      # Ball is over basket within 25mm XY
 
 # Timing
+DROP_HOVER_HEIGHT = 0.100        # TCP height above the basket rim while dropping [m]
+                                 # (80 mm left the fingertips <30 mm from the walls in ~half of layouts)
+CLEARANCE_MAX = 0.10             # Clearance is reported up to this distance [m]
 PHYSICS_SUBSTEPS = 5             # MuJoCo substeps per env step
 MAX_EPISODE_STEPS = 500          # Steps before truncation
 MIN_SEPARATION = 0.125           # Minimum ball-box separation [m]
@@ -146,9 +152,9 @@ class BimanualPickPlaceEnv(gym.Env):
         # ---- Observation & Action spaces ----
         # obs: skill(3) + arm(2) + q(7) + qdot(7) + ee_pos(3) + ee_quat(4) +
         #      gripper(1) + ball_ee(3) + ball_vel(3) + ball_basket(3) +
-        #      clearance(1) + prev_action(7) = 44
-        self.obs_dim = 44
-        self.action_dim = 7  # delta_pos(3) + delta_orient(3) + gripper(1)
+        #      clearance(1) + prev_action(4) = 41
+        self.obs_dim = 41
+        self.action_dim = 4  # delta_pos(3) + gripper(1)
 
         self.observation_space = spaces.Box(
             low=-np.inf, high=np.inf,
@@ -278,6 +284,44 @@ class BimanualPickPlaceEnv(gym.Env):
         # Box body id (ball id is stored above) for direct xpos indexing
         self._box_body_id = box_bid
 
+        # Collision geoms used for the true arm-to-basket distance. Visual-only
+        # geoms (no contype/conaffinity) are excluded: they can't collide, so
+        # they must not shrink the reported clearance.
+        #
+        # mj_geomDistance is NOT used: for mesh-vs-box pairs it can return an
+        # exact 0 with the witness points tens of mm apart (observed with
+        # MuJoCo 3.10, independent of ccd_iterations). Instead the distance is
+        # measured from each arm collision mesh's vertices to the basket's box
+        # geoms, which is exact for the box side and tight for dense meshes.
+        collidable = (m.geom_contype > 0) | (m.geom_conaffinity > 0)
+        self._box_clearance_geoms = np.array(
+            sorted(i for i in self._box_geom_ids if collidable[i]), dtype=int)
+        # The basket walls are axis-aligned in the box body frame, so their
+        # centres/half-sizes are constant there and points only need to be
+        # moved into that one frame per step.
+        assert np.allclose(m.geom_quat[self._box_clearance_geoms], [1, 0, 0, 0]), \
+            "basket geoms are expected to be axis-aligned in the box body frame"
+        self._box_local_centres = m.geom_pos[self._box_clearance_geoms].copy()   # (B, 3)
+        self._box_half_sizes = m.geom_size[self._box_clearance_geoms].copy()      # (B, 3)
+        self._box_bound_radius = float(
+            (np.linalg.norm(self._box_local_centres, axis=1)
+             + np.linalg.norm(self._box_half_sizes, axis=1)).max())
+        self._arm_clearance = {}
+        for side, ids in (("left", self._left_arm_geom_ids),
+                          ("right", self._right_arm_geom_ids)):
+            entries = []
+            for gid in sorted(i for i in ids if collidable[i]):
+                if m.geom_type[gid] == mujoco.mjtGeom.mjGEOM_MESH:
+                    mid = m.geom_dataid[gid]
+                    v0, nv = m.mesh_vertadr[mid], m.mesh_vertnum[mid]
+                    verts = m.mesh_vert[v0:v0 + nv].reshape(-1, 3).astype(np.float64)
+                    verts = _hull_vertices(verts)
+                else:
+                    verts = None  # primitive: handled via mj_geomDistance
+                entries.append((gid, float(m.geom_rbound[gid]), verts))
+            self._arm_clearance[side] = entries
+        self._fromto = np.zeros(6)
+
         # DoF addresses for velocity readout
         self._left_dof_adr = self.ik._left_dof_adr
         self._right_dof_adr = self.ik._right_dof_adr
@@ -342,6 +386,7 @@ class BimanualPickPlaceEnv(gym.Env):
         self._prev_action = np.zeros(self.action_dim, dtype=np.float32)
         self._ball_grasped = False
         self._ball_released = False
+        self.reward_calc.reset()
 
         # Disable weld constraints
         self.model.eq_active0[self._left_weld_id] = 0
@@ -370,32 +415,32 @@ class BimanualPickPlaceEnv(gym.Env):
         self._step_count += 1
 
         # ---- 1. IK base target for current phase ----
-        ik_target_pos, ik_target_quat = self._get_phase_target()
+        ik_target_pos = self._get_phase_target()
 
         # ---- 2. Apply residual corrections ----
         delta_pos = action[:3] * POS_RESIDUAL_SCALE
-        delta_orient = action[3:6] * ORIENT_RESIDUAL_SCALE
-        gripper_cmd = action[6]  # [-1, 1] -> [closed, open]
+        if self._active_arm == "right":
+            # Observations are mirrored (Y flipped) for the right arm so the
+            # policy sees a canonical left-arm world. Its action lives in that
+            # same canonical frame, so un-mirror it before applying it in the
+            # world frame; otherwise "+Y" moves the right arm the wrong way.
+            delta_pos[1] = -delta_pos[1]
+        gripper_cmd = action[3]  # [-1, 1] -> [closed, open]
 
         # Corrected Cartesian target
         corrected_pos = ik_target_pos + delta_pos
-
-        # For orientation: apply residual as small rotation to base quaternion
-        corrected_quat = None
-        if ik_target_quat is not None:
-            corrected_quat = _apply_rotation_residual(ik_target_quat, delta_orient)
 
         # ---- 3. Solve IK and execute ----
         # (the solver recomputes kinematics itself, so skip it in the sync)
         self.ik.sync_from(self.data, forward=False)
         if self._active_arm == "left":
             ik_result = self.ik.solve_left(
-                target_pos=corrected_pos, target_quat=corrected_quat,
+                target_pos=corrected_pos,
                 q_init=self.data.qpos[self._left_qpos_adr].copy()
             )
         else:
             ik_result = self.ik.solve_right(
-                target_pos=corrected_pos, target_quat=corrected_quat,
+                target_pos=corrected_pos,
                 q_init=self.data.qpos[self._right_qpos_adr].copy()
             )
 
@@ -427,7 +472,7 @@ class BimanualPickPlaceEnv(gym.Env):
         finger_contacts = self._check_finger_ball_contacts()
         arm_basket_contact = self._check_arm_box_contact()
         basket_clearance = self._compute_basket_clearance(
-            ee_pos=ee_pos, arm_box_contact=arm_basket_contact)
+            arm_box_contact=arm_basket_contact)
 
         # Ball in box check
         ball_in_box = self._check_ball_in_box(ball_pos, box_pos)
@@ -451,7 +496,6 @@ class BimanualPickPlaceEnv(gym.Env):
             ee_pos=ee_pos,
             ball_pos=ball_pos,
             basket_pos=box_pos,
-            ee_quat=ee_quat,
             ball_vel=ball_vel,
             finger_contacts=finger_contacts,
             basket_clearance=basket_clearance,
@@ -462,6 +506,7 @@ class BimanualPickPlaceEnv(gym.Env):
             table_z=TABLE_Z,
             box_rim_z=BOX_RIM_Z,
             ball_in_box=ball_in_box,
+            ball_released=self._ball_released,
         )
 
         self._prev_action = action.copy()
@@ -503,6 +548,9 @@ class BimanualPickPlaceEnv(gym.Env):
             "ball_in_box": ball_in_box,
             "arm_basket_contact": arm_basket_contact,
             "basket_clearance": basket_clearance,
+            # True only for a genuine success: the ball was released and is in
+            # the basket (i.e. the episode terminated), not a timeout.
+            "is_success": terminated,
             "ik_converged": ik_result.converged,
             "ik_pos_error": ik_result.pos_error,
         }
@@ -564,7 +612,7 @@ class BimanualPickPlaceEnv(gym.Env):
         ball_ee_vec = (ball_pos - ee_pos).astype(np.float32)
         ball_basket_vec = (box_pos - ball_pos).astype(np.float32)
         if basket_clearance is None:
-            basket_clearance = self._compute_basket_clearance(ee_pos=ee_pos)
+            basket_clearance = self._compute_basket_clearance()
         basket_clearance = np.array([basket_clearance], dtype=np.float32)
 
         # Mirror observations for right arm (flip Y axis so policy sees
@@ -610,8 +658,10 @@ class BimanualPickPlaceEnv(gym.Env):
         ball_ee_vec[1] = -ball_ee_vec[1]
         ball_basket_vec[1] = -ball_basket_vec[1]
 
-        # Mirror quaternion: negate y and z components for Y-reflection
-        ee_quat[2] = -ee_quat[2]  # y component
+        # Mirror quaternion (w, x, y, z) across the XZ plane (y -> -y).
+        # A rotation is an axial vector, so a reflection with normal Y keeps
+        # the component along Y and flips the other two: (w, -x, y, -z).
+        ee_quat[1] = -ee_quat[1]  # x component
         ee_quat[3] = -ee_quat[3]  # z component
 
         return ee_pos, ee_quat, ball_ee_vec, ball_basket_vec
@@ -621,9 +671,10 @@ class BimanualPickPlaceEnv(gym.Env):
     # =================================================================
 
     def _get_phase_target(self):
-        """Compute the IK base Cartesian target for the current phase.
+        """Compute the IK base Cartesian position target for the current phase.
 
-        Returns (target_pos, target_quat) where target_quat may be None.
+        Orientation is left to the IK solver (position-only IK); the policy
+        does not command it.
         """
         ball_pos = self.data.xpos[self._ball_body_id].copy()
         box_pos = self.data.xpos[self._box_body_id].copy()
@@ -638,7 +689,7 @@ class BimanualPickPlaceEnv(gym.Env):
             else:
                 # Close: descend to ball equator
                 target = ball_pos.copy()
-            return target, None
+            return target
 
         elif self._phase == PHASE_GRASP:
             # Target: at ball position (grasping), then lift
@@ -648,15 +699,15 @@ class BimanualPickPlaceEnv(gym.Env):
                 # Lift phase
                 target = ball_pos.copy()
                 target[2] = TABLE_Z + 0.170  # Lift height
-            return target, None
+            return target
 
         elif self._phase == PHASE_DROP:
             # Target: above box with safe clearance
             target = box_pos.copy()
-            target[2] = BOX_RIM_Z + 0.080  # 80mm above rim
-            return target, None
+            target[2] = BOX_RIM_Z + DROP_HOVER_HEIGHT
+            return target
 
-        return ball_pos.copy(), None
+        return ball_pos.copy()
 
     # =================================================================
     # Phase transition logic
@@ -746,31 +797,55 @@ class BimanualPickPlaceEnv(gym.Env):
         box = self._box_geom_mask
         return bool(((arm[g1] & box[g2]) | (arm[g2] & box[g1])).any())
 
-    def _compute_basket_clearance(self, ee_pos=None, arm_box_contact=None) -> float:
-        """Estimate minimum distance from active arm to basket.
+    def _compute_basket_clearance(self, arm_box_contact=None) -> float:
+        """Minimum distance from the active arm's collision geometry to the basket.
 
-        Uses end-effector-to-box-center distance as a proxy.
-        For higher fidelity, one would use mj_distanceGeoms or iterate
-        contact.dist, but this is fast and sufficient for reward shaping.
+        Measured on the real link and finger meshes (not a point-to-box
+        proxy), so hovering above the basket is correctly "clear" while a
+        finger brushing a wall is not. The result is capped at
+        ``CLEARANCE_MAX`` and is 0 when anything is touching.
 
-        ``ee_pos`` / ``arm_box_contact`` may be passed in when already known
-        for the current simulation state, to avoid recomputing them.
+        For each arm collision mesh the distance from its vertices to the
+        basket's box geoms is used; this slightly overestimates the true
+        distance by at most the mesh vertex spacing. Geoms whose bounding
+        sphere is farther than ``CLEARANCE_MAX`` from the basket are skipped.
+
+        ``arm_box_contact`` may be passed in when already known for the
+        current simulation state, to avoid rescanning the contacts.
         """
-        if ee_pos is None:
-            ee_pos, _ = self._get_ee_state()
         if arm_box_contact is None:
             arm_box_contact = self._check_arm_box_contact()
-
-        # Actual contact means zero clearance
         if arm_box_contact:
             return 0.0
 
-        box_pos = self.data.xpos[self._box_body_id]
-        # Distance from EE to nearest box wall edge (approximate)
-        dx = max(0.0, abs(ee_pos[0] - box_pos[0]) - BOX_HALF_SIZE)
-        dy = max(0.0, abs(ee_pos[1] - box_pos[1]) - BOX_HALF_SIZE)
-        dz = max(0.0, ee_pos[2] - (box_pos[2] + BOX_DEPTH))
-        return float(np.sqrt(dx * dx + dy * dy + dz * dz))
+        m, d = self.model, self.data
+        centre = d.xpos[self._box_body_id]
+        box_R = d.xmat[self._box_body_id].reshape(3, 3)
+
+        # Gather the vertices of every arm geom that could be within range.
+        best = CLEARANCE_MAX
+        near = []
+        for gid, rbound, verts in self._arm_clearance[self._active_arm]:
+            gpos = d.geom_xpos[gid]
+            # Bounding-sphere reject: this geom cannot be closer than `best`.
+            if np.linalg.norm(gpos - centre) - rbound - self._box_bound_radius >= best:
+                continue
+            if verts is None:
+                for g2 in self._box_clearance_geoms:
+                    dist = mujoco.mj_geomDistance(m, d, gid, g2, best, self._fromto)
+                    if dist < best:
+                        best = dist
+                continue
+            near.append(verts @ d.geom_xmat[gid].reshape(3, 3).T + gpos)
+        if not near:
+            return max(best, 0.0)
+
+        # One transform into the basket frame, then point-to-box distances.
+        pts = (np.concatenate(near) - centre) @ box_R                     # (n, 3)
+        excess = np.abs(pts[None] - self._box_local_centres[:, None]) - self._box_half_sizes[:, None]
+        np.maximum(excess, 0.0, out=excess)
+        dist = float(np.sqrt(np.einsum("bnk,bnk->bn", excess, excess).min()))
+        return max(min(best, dist), 0.0)
 
     def _check_ball_in_box(self, ball_pos, box_pos) -> bool:
         """Check if ball is inside the box aperture."""
@@ -853,46 +928,21 @@ class BimanualPickPlaceEnv(gym.Env):
 
 
 # =====================================================================
-# Helper: Apply small rotation residual to a quaternion
+# Helper: reduce a mesh to its convex-hull vertices
 # =====================================================================
-def _apply_rotation_residual(base_quat: np.ndarray, delta_rot: np.ndarray) -> np.ndarray:
-    """Apply a small rotation vector delta to a base quaternion.
+def _hull_vertices(verts: np.ndarray) -> np.ndarray:
+    """Keep only the convex-hull vertices of a point set.
 
-    Parameters
-    ----------
-    base_quat : ndarray (4,)  -- (w, x, y, z)
-    delta_rot : ndarray (3,)  -- rotation vector (axis * angle)
-
-    Returns
-    -------
-    result_quat : ndarray (4,) -- (w, x, y, z)
+    MuJoCo collides meshes by their convex hull, and interior vertices can
+    never be the closest point of a convex shape, so dropping them makes
+    the per-step clearance query several times cheaper. Falls back to all
+    vertices if scipy is unavailable or the hull cannot be built.
     """
-    angle = np.linalg.norm(delta_rot)
-    if angle < 1e-8:
-        return base_quat.copy()
-
-    axis = delta_rot / angle
-    half_angle = angle / 2.0
-    dq = np.array([
-        np.cos(half_angle),
-        axis[0] * np.sin(half_angle),
-        axis[1] * np.sin(half_angle),
-        axis[2] * np.sin(half_angle),
-    ])
-
-    # Quaternion multiplication: dq * base_quat
-    w1, x1, y1, z1 = dq
-    w2, x2, y2, z2 = base_quat
-    result = np.array([
-        w1*w2 - x1*x2 - y1*y2 - z1*z2,
-        w1*x2 + x1*w2 + y1*z2 - z1*y2,
-        w1*y2 - x1*z2 + y1*w2 + z1*x2,
-        w1*z2 + x1*y2 - y1*x2 + z1*w2,
-    ])
-
-    # Normalize
-    result /= np.linalg.norm(result) + 1e-16
-    return result
+    try:
+        from scipy.spatial import ConvexHull
+        return verts[ConvexHull(verts).vertices]
+    except Exception:
+        return verts
 
 
 # =====================================================================

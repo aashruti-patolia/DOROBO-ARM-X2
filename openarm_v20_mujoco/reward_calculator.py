@@ -31,7 +31,6 @@ class RewardConfig:
     # -- Picking (Phase 0) --
     pick_distance_scale: float = 5.0       # tanh steepness for reach distance
     pick_distance_weight: float = 1.0      # weight of distance shaping
-    pick_orient_weight: float = 0.3        # bonus for grasp-approach alignment
     pick_height_match_weight: float = 0.2  # bonus for matching ball Z
 
     # -- Grasping (Phase 1) --
@@ -47,12 +46,13 @@ class RewardConfig:
     drop_height_bonus: float = 1.0         # bonus for being at safe release Z
     drop_safe_height_margin: float = 0.02  # epsilon above rim [m]
     drop_low_velocity_weight: float = 0.5  # bonus for near-zero XY velocity
-    drop_release_bonus: float = 5.0        # one-time bonus for successful release
-    drop_ball_in_box_bonus: float = 10.0   # big bonus when ball lands inside
+    drop_release_bonus: float = 2.5        # paid ONCE per episode on a release over the basket
+    drop_ball_in_box_bonus: float = 10.0   # paid ONCE per episode when the released ball lands inside
 
     # -- Basket collision penalty --
-    collision_exp_lambda: float = 5.0      # exponential penalty magnitude
+    collision_exp_lambda: float = 5.0      # exponential penalty magnitude at zero clearance
     collision_exp_k: float = 20.0          # exponential decay rate
+    collision_margin: float = 0.03         # clearance [m] beyond which the soft penalty is zero
     collision_contact_penalty: float = -10.0  # hard penalty on actual contact
     collision_curriculum_weight: float = 1.0  # multiplied by curriculum schedule
 
@@ -61,7 +61,7 @@ class RewardConfig:
 
     # -- General --
     time_penalty: float = -0.002           # small per-step penalty for speed
-    success_bonus: float = 20.0            # episode-level success bonus
+    success_bonus: float = 20.0            # paid ONCE per episode on a successful, released drop
 
 
 class RewardCalculator:
@@ -72,7 +72,7 @@ class RewardCalculator:
         reward, info = rc.compute(
             phase=0,
             ee_pos=..., ball_pos=..., basket_pos=...,
-            ee_quat=..., ball_vel=...,
+            ball_vel=...,
             finger_contacts=(True, False),
             basket_clearance=0.05,
             arm_basket_contact=False,
@@ -82,11 +82,24 @@ class RewardCalculator:
             table_z=0.25,
             box_rim_z=0.31,
             ball_in_box=False,
+            ball_released=False,
         )
     """
 
     def __init__(self, config: RewardConfig | None = None):
         self.cfg = config or RewardConfig()
+        self.reset()
+
+    def reset(self):
+        """Clear per-episode state. Call at the start of every episode.
+
+        The release, in-box and success bonuses are one-time payouts; this
+        re-arms them. (Paying them every step would reward lingering in the
+        rewarded state instead of reaching it.)
+        """
+        self._release_paid = False
+        self._in_box_paid = False
+        self._success_paid = False
 
     def compute(
         self,
@@ -94,7 +107,6 @@ class RewardCalculator:
         ee_pos: np.ndarray,
         ball_pos: np.ndarray,
         basket_pos: np.ndarray,
-        ee_quat: np.ndarray,
         ball_vel: np.ndarray,
         finger_contacts: tuple[bool, bool],
         basket_clearance: float,
@@ -105,6 +117,7 @@ class RewardCalculator:
         table_z: float,
         box_rim_z: float,
         ball_in_box: bool,
+        ball_released: bool = True,
     ) -> tuple[float, dict]:
         """Compute the total reward for the current step.
 
@@ -118,8 +131,6 @@ class RewardCalculator:
             Ball center position in world frame.
         basket_pos : ndarray (3,)
             Basket center (bottom) position in world frame.
-        ee_quat : ndarray (4,)
-            End-effector quaternion (w, x, y, z).
         ball_vel : ndarray (6,) or (3,)
             Ball linear velocity (first 3 components used).
         finger_contacts : tuple(bool, bool)
@@ -140,6 +151,9 @@ class RewardCalculator:
             Top of basket rim Z coordinate [m].
         ball_in_box : bool
             Whether the ball has landed inside the basket.
+        ball_released : bool
+            Whether the gripper has let go of the ball. The in-box and success
+            bonuses require it, so holding the ball in the basket pays nothing.
 
         Returns
         -------
@@ -156,7 +170,7 @@ class RewardCalculator:
         r_drop = 0.0
 
         if phase == 0:
-            r_pick, pick_info = self._pick_reward(ee_pos, ball_pos, ee_quat, table_z)
+            r_pick, pick_info = self._pick_reward(ee_pos, ball_pos)
             info.update(pick_info)
         elif phase == 1:
             r_grasp, grasp_info = self._grasp_reward(
@@ -167,7 +181,7 @@ class RewardCalculator:
         elif phase == 2:
             r_drop, drop_info = self._drop_reward(
                 ee_pos, ball_pos, basket_pos, ball_vel,
-                gripper_open_ratio, box_rim_z, ball_in_box
+                gripper_open_ratio, box_rim_z, ball_in_box and ball_released
             )
             info.update(drop_info)
 
@@ -186,7 +200,10 @@ class RewardCalculator:
         info["r_time"] = r_time
 
         # ---- Success bonus ----
-        r_success = cfg.success_bonus if ball_in_box and phase == 2 else 0.0
+        r_success = 0.0
+        if ball_in_box and ball_released and phase == 2 and not self._success_paid:
+            r_success = cfg.success_bonus
+            self._success_paid = True
         info["r_success"] = r_success
 
         total = r_pick + r_grasp + r_drop + r_collision + r_smooth + r_time + r_success
@@ -205,8 +222,6 @@ class RewardCalculator:
         self,
         ee_pos: np.ndarray,
         ball_pos: np.ndarray,
-        ee_quat: np.ndarray,
-        table_z: float,
     ) -> tuple[float, dict]:
         """Dense distance-shaped reward for reaching the ball."""
         cfg = self.cfg
@@ -217,24 +232,14 @@ class RewardCalculator:
             1.0 - np.tanh(cfg.pick_distance_scale * dist)
         )
 
-        # Orientation alignment bonus:
-        # Reward the EE Z-axis pointing generally downward (toward table)
-        # ee_quat -> rotation matrix -> z-axis column
-        ee_z_axis = _quat_to_z_axis(ee_quat)
-        # Ideal: z-axis should have a negative z-component (pointing down)
-        # Dot with [0, 0, -1]
-        align = -ee_z_axis[2]  # Higher is better (max 1.0 when pointing down)
-        r_orient = cfg.pick_orient_weight * max(0.0, align)
-
         # Height matching: bonus for being at ball height
         height_err = abs(ee_pos[2] - ball_pos[2])
         r_height = cfg.pick_height_match_weight * max(0.0, 1.0 - 10.0 * height_err)
 
-        total = r_dist + r_orient + r_height
+        total = r_dist + r_height
         return total, {
             "pick_dist": dist,
             "pick_r_dist": r_dist,
-            "pick_r_orient": r_orient,
             "pick_r_height": r_height,
         }
 
@@ -315,13 +320,19 @@ class RewardCalculator:
         xy_speed = np.linalg.norm(ball_lin_vel[:2])
         r_low_vel = cfg.drop_low_velocity_weight * max(0.0, 1.0 - 5.0 * xy_speed)
 
-        # Release bonus: gripper open while positioned over basket
+        # Release bonus (once per episode): gripper open over the basket
         r_release = 0.0
-        if gripper_open_ratio > 0.7 and xy_dist < 0.03:
-            r_release = cfg.drop_release_bonus * 0.5  # Partial
+        if (not self._release_paid
+                and gripper_open_ratio > 0.7 and xy_dist < 0.03):
+            r_release = cfg.drop_release_bonus
+            self._release_paid = True
 
-        # Ball landed in box bonus
-        r_in_box = cfg.drop_ball_in_box_bonus if ball_in_box else 0.0
+        # Ball landed in box bonus (once per episode; caller passes
+        # ball_in_box only after the ball has been released)
+        r_in_box = 0.0
+        if ball_in_box and not self._in_box_paid:
+            r_in_box = cfg.drop_ball_in_box_bonus
+            self._in_box_paid = True
 
         total = r_xy + r_height + r_low_vel + r_release + r_in_box
         return total, {
@@ -339,13 +350,19 @@ class RewardCalculator:
     def _collision_penalty(
         self, basket_clearance: float, arm_basket_contact: bool
     ) -> float:
-        """Exponential penalty as clearance -> 0, hard penalty on contact."""
+        """Exponential penalty as clearance -> 0, hard penalty on contact.
+
+        The soft term is shifted so it reaches exactly zero at
+        ``collision_margin``: staying a safe distance from the basket (e.g.
+        hovering above it before the drop) is free, and only intrusions
+        inside the margin are penalised.
+        """
         cfg = self.cfg
 
-        # Soft exponential penalty
-        r_soft = -cfg.collision_exp_lambda * np.exp(
-            -cfg.collision_exp_k * max(basket_clearance, 0.0)
-        )
+        # Soft exponential penalty, shifted/rescaled to vanish at the margin
+        floor = np.exp(-cfg.collision_exp_k * cfg.collision_margin)
+        raw = np.exp(-cfg.collision_exp_k * max(basket_clearance, 0.0))
+        r_soft = -cfg.collision_exp_lambda * max(0.0, raw - floor) / (1.0 - floor)
 
         # Hard contact penalty
         r_hard = cfg.collision_contact_penalty if arm_basket_contact else 0.0
@@ -374,17 +391,3 @@ class RewardCalculator:
             Ramp from 0.0 (early training) to 1.0 (full penalty).
         """
         self.cfg.collision_curriculum_weight = np.clip(collision_weight, 0.0, 2.0)
-
-
-# =====================================================================
-# Helper
-# =====================================================================
-def _quat_to_z_axis(quat: np.ndarray) -> np.ndarray:
-    """Extract the Z-axis (third column) of the rotation matrix from quaternion (w,x,y,z)."""
-    w, x, y, z = quat
-    return np.array([
-        2.0 * (x * z + w * y),
-        2.0 * (y * z - w * x),
-        1.0 - 2.0 * (x * x + y * y),
-    ])
-

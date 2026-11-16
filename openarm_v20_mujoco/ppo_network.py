@@ -44,9 +44,9 @@ class SkillConditionedActorCritic(nn.Module):
       - arm_id (2,) one-hot: [LEFT, RIGHT]
       - proprioception: joint_pos (7,), joint_vel (7,), ee_pos (3,), ee_quat (4,), gripper_state (1,)
       - exteroception: ball_ee_vec (3,), ball_vel (3,), ball_basket_vec (3,), basket_clearance (1,)
-      - prev_action (7,)
+      - prev_action (4,)
 
-    Action space: 7 continuous dims = delta_pos (3,) + delta_orient (3,) + gripper (1,)
+    Action space: 4 continuous dims = delta_pos (3,) + gripper (1,)
     All outputs are in [-1, 1] (scaled externally).
 
     Parameters
@@ -54,7 +54,7 @@ class SkillConditionedActorCritic(nn.Module):
     obs_dim : int
         Total flattened observation dimensionality.
     action_dim : int
-        Number of continuous action dimensions (default: 7).
+        Number of continuous action dimensions (default: 4).
     hidden_sizes : tuple
         Sizes of shared backbone hidden layers.
     actor_hidden : int
@@ -68,7 +68,7 @@ class SkillConditionedActorCritic(nn.Module):
     def __init__(
         self,
         obs_dim: int,
-        action_dim: int = 7,
+        action_dim: int = 4,
         hidden_sizes: tuple[int, ...] = (256, 256),
         actor_hidden: int = 128,
         critic_hidden: int = 128,
