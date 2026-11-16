@@ -396,6 +396,7 @@ class OpenArmPickAndPlace:
 
         # Task statistics
         self.completed_cycles = 0
+        self.successful_cycles = 0
         self.run_mode = True
 
         # Initialize arms to home posture
@@ -705,23 +706,47 @@ class OpenArmPickAndPlace:
         else:
             print(f"[WARN] Contact detected between arm/gripper and box ({box_contacts} contact events).")
 
-        success = self.check_ball_in_box(box_spawn)
-        final_ball = self.data.body("ball").xpos
-        final_box = self.data.body("box").xpos
-        offset = np.hypot(final_ball[0] - final_box[0], final_ball[1] - final_box[1])
+        # Let the ball finish falling and bouncing before judging: the verdict
+        # below is about where it comes to rest, not where it is in mid-air.
+        ball_dof = self.workspace.ball_dof_adr
+        for _ in range(750):                                   # up to 1.5 s
+            if np.linalg.norm(self.data.qvel[ball_dof:ball_dof + 3]) < 0.02:
+                break
+            mujoco.mj_step(self.model, self.data)
+            box_contacts += self.check_arm_box_contacts()
+            if viewer is not None:
+                viewer.sync()
 
-        if success or offset < cfg.box_half_size:
-            print(
-                f"[SUCCESS] Ball successfully placed inside box! (Offset from box center: {offset*1000:.1f} mm)"
-            )
-            self.completed_cycles += 1
-            return True
-        else:
-            print(
-                f"[WARN] Ball landed near box (offset: {offset*1000:.1f} mm)."
-            )
-            self.completed_cycles += 1
+        # Judge the result on the box as it actually is now, not where it was
+        # spawned: the ball must lie inside the box's own walls, and the box must
+        # still be upright on the table. A box that was knocked over, or touched
+        # by the gripper, is a failed cycle even if the ball ended up near it.
+        final_ball = self.data.body("ball").xpos.copy()
+        final_box = self.data.body("box").xpos.copy()
+        box_rot = self.data.body("box").xmat.reshape(3, 3)
+        tilt_deg = float(np.degrees(np.arccos(np.clip(box_rot[2, 2], -1.0, 1.0))))
+        local = box_rot.T @ (final_ball - final_box)
+        inner = cfg.box_half_size - 0.008
+        inside = bool(abs(local[0]) < inner and abs(local[1]) < inner
+                      and 0.008 < local[2] < cfg.box_depth)
+        upright = tilt_deg < 15.0 and abs(final_box[2] - cfg.table_z) < 0.01
+        offset = float(np.hypot(local[0], local[1]))
+
+        self.completed_cycles += 1
+        if not upright:
+            print(f"[FAIL] Box was knocked over or moved off the table (tilt {tilt_deg:.0f} deg).")
             return False
+        if box_contacts > 0:
+            print(f"[FAIL] Gripper/arm touched the box ({box_contacts} contact events).")
+            return False
+        if not inside:
+            print(f"[FAIL] Ball is not inside the box (offset from box center: {offset*1000:.1f} mm, "
+                  f"height above box floor: {local[2]*1000:.1f} mm).")
+            return False
+        print(f"[SUCCESS] Ball placed inside the upright box, no gripper contact "
+              f"(offset from box center: {offset*1000:.1f} mm).")
+        self.successful_cycles += 1
+        return True
 
 
 # =====================================================================
@@ -794,7 +819,7 @@ def main():
                 f"[STATUS] Completed {cycle_count}/{max_cycles} cycles. Relocating for next cycle..."
             )
             time.sleep(0.2)
-        print(f"\n[DONE] Successfully executed {cycle_count} autonomous cycles!")
+        print(f"\n[DONE] {controller.successful_cycles} of {cycle_count} cycles succeeded.")
 
     else:
         # Interactive 3D Viewer loop

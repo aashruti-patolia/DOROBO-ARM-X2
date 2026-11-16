@@ -53,8 +53,10 @@ class RewardConfig:
     collision_exp_lambda: float = 5.0      # exponential penalty magnitude at zero clearance
     collision_exp_k: float = 20.0          # exponential decay rate
     collision_margin: float = 0.03         # clearance [m] beyond which the soft penalty is zero
-    collision_contact_penalty: float = -10.0  # hard penalty on actual contact
-    collision_curriculum_weight: float = 1.0  # multiplied by curriculum schedule
+    collision_contact_penalty: float = -10.0  # hard penalty on actual contact (ALWAYS full strength)
+    collision_curriculum_weight: float = 1.0  # curriculum weight of the soft proximity term only
+    failure_penalty: float = -20.0            # once, when the episode fails: the gripper touched
+                                              # the basket or the basket was tipped over
 
     # -- Action smoothness --
     smoothness_weight: float = 0.01        # ||da_t - da_{t-1}||^2 coefficient
@@ -118,6 +120,7 @@ class RewardCalculator:
         box_rim_z: float,
         ball_in_box: bool,
         ball_released: bool = True,
+        task_failed: bool = False,
     ) -> tuple[float, dict]:
         """Compute the total reward for the current step.
 
@@ -154,6 +157,9 @@ class RewardCalculator:
         ball_released : bool
             Whether the gripper has let go of the ball. The in-box and success
             bonuses require it, so holding the ball in the basket pays nothing.
+        task_failed : bool
+            The episode just failed (gripper touched the basket, or the basket
+            was tipped). Pays ``failure_penalty`` and no success bonus.
 
         Returns
         -------
@@ -201,12 +207,18 @@ class RewardCalculator:
 
         # ---- Success bonus ----
         r_success = 0.0
-        if ball_in_box and ball_released and phase == 2 and not self._success_paid:
+        if (ball_in_box and ball_released and phase == 2 and not task_failed
+                and not self._success_paid):
             r_success = cfg.success_bonus
             self._success_paid = True
         info["r_success"] = r_success
 
-        total = r_pick + r_grasp + r_drop + r_collision + r_smooth + r_time + r_success
+        # ---- Failure penalty ----
+        r_failure = cfg.failure_penalty if task_failed else 0.0
+        info["r_failure"] = r_failure
+
+        total = (r_pick + r_grasp + r_drop + r_collision + r_smooth + r_time
+                 + r_success + r_failure)
 
         info["r_pick"] = r_pick
         info["r_grasp"] = r_grasp
@@ -367,7 +379,9 @@ class RewardCalculator:
         # Hard contact penalty
         r_hard = cfg.collision_contact_penalty if arm_basket_contact else 0.0
 
-        return cfg.collision_curriculum_weight * (r_soft + r_hard)
+        # Only the soft "getting close" term is eased in by the curriculum.
+        # Actually touching the basket is penalised in full from the first step.
+        return cfg.collision_curriculum_weight * r_soft + r_hard
 
     # -----------------------------------------------------------------
     # Action smoothness penalty

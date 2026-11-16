@@ -1,5 +1,9 @@
 <mujoco model="openarm_v20">
   <compiler angle="radian" meshdir="mj_meshes"/>
+  <!-- Elliptic friction cones, a high impratio and no-slip iterations make friction
+       effectively hard. With the defaults a ball held only by finger friction slowly
+       creeps out of the grip (it fell out within 3 s); with these it stays put. -->
+  <option cone="elliptic" impratio="10" noslip_iterations="5"/>
 
   <visual>
     <headlight ambient="0.3 0.3 0.3" diffuse="0.45 0.45 0.45"/>
@@ -143,6 +147,10 @@
                     <geom name="openarm_left_ee_base_link_collision" pos="0.0205 0 0" quat="1 0 0 0" type="mesh" group="3" mesh="end_effector__pinch_gripper__collision__ee_base_link"/>
                     <!-- IK target site: Tool Centre Point (TCP) at the gripper fingertip midpoint -->
                     <site name="left_ee_site" pos="-0.00143 0 -0.093" size="0.008" rgba="0 1 0 0.5" group="4"/>
+                    <!-- Pinch point: midway between the finger pads, 13 mm above the fingertips,
+                         i.e. where the ball centre sits when it is gripped. The TCP site above is
+                         ~65 mm higher up the fingers (kept as-is for pick_and_place.py). -->
+                    <site name="left_pinch_site" pos="-0.00143 0 -0.158" size="0.006" rgba="1 0 1 0.6" group="4"/>
                     <body name="openarm_left_ee_link1" pos="-0.00143 -0.018 -0.068" gravcomp="1">
                       <inertial pos="-0.0124991 -0.00176593 -0.0241663" quat="0.982638 0.0922083 -0.15927 -0.0235192" mass="0.125979" diaginertia="3.8543e-05 3.6883e-05 1.43942e-05"/>
                       <joint name="openarm_left_finger_joint1" range="0 0.7854" actuatorfrcrange="-7 7" armature="0.01" damping="1" axis="-1 0 0"/>
@@ -211,6 +219,10 @@
                     <geom name="openarm_right_ee_base_link_collision" pos="0.0205 0 0" quat="1 0 0 0" type="mesh" group="3" mesh="end_effector__pinch_gripper__collision__ee_base_link1"/>
                     <!-- IK target site: Tool Centre Point (TCP) at the gripper fingertip midpoint -->
                     <site name="right_ee_site" pos="-0.00143 0 -0.093" size="0.008" rgba="0 1 0 0.5" group="4"/>
+                    <!-- Pinch point: midway between the finger pads, 13 mm above the fingertips,
+                         i.e. where the ball centre sits when it is gripped. The TCP site above is
+                         ~65 mm higher up the fingers (kept as-is for pick_and_place.py). -->
+                    <site name="right_pinch_site" pos="-0.00143 0 -0.158" size="0.006" rgba="1 0 1 0.6" group="4"/>
                     <body name="openarm_right_ee_link1" pos="-0.00143 0.018 -0.068" gravcomp="1">
                       <inertial pos="-0.0124991 0.00176593 -0.0241663" quat="0.982638 -0.0922083 -0.15927 0.0235192" mass="0.125979" diaginertia="3.8543e-05 3.6883e-05 1.43942e-05"/>
                       <joint name="openarm_right_finger_joint1" range="-0.7854 0" actuatorfrcrange="-7 7" armature="0.01" damping="1" axis="-1 0 0"/>
@@ -243,8 +255,10 @@
     <!-- =============================================================== -->
     <!-- WORKSPACE TABLE, BALL, AND BOX (Pick and Place Task)            -->
     <!-- =============================================================== -->
-    <!-- Table surface in front of robot (top at z = 0.25 m) -->
-    <geom name="workspace_table" type="box" size="0.22 0.32 0.125" pos="0.24 0 0.125"
+    <!-- Table (top at z = 0.25 m), sized to the arms' full reach in front of the
+         torso (see tools/compute_workspace.py). It starts at x = 0.08 so it clears
+         the torso and the hands hanging at their home pose. -->
+    <geom name="workspace_table" type="box" size="0.245 0.55 0.125" pos="0.325 0 0.125"
           rgba="0.82 0.80 0.76 1" friction="1.2 0.05 0.001" contype="1" conaffinity="1"/>
 
     <!-- Red Ball to be picked -->
@@ -270,6 +284,21 @@
       <geom name="box_wall_r" type="box" size="0.037 0.004 0.03" pos="0 -0.041 0.03"
             rgba="0.12 0.35 0.95 0.85"/>
       <site name="box_target_site" pos="0 0 0.035" size="0.008" rgba="0 1 1 0.4"/>
+    </body>
+
+    <!-- Distractor blocks. Fixed obstacles that scenarios place on the table; parked
+         below it (z = -5) whenever unused. -->
+    <body name="distractor_0" pos="0 0 -5">
+      <geom name="distractor_0_geom" type="box" size="0.02 0.02 0.03"
+            rgba="0.55 0.55 0.58 1" friction="1.2 0.05 0.001" contype="1" conaffinity="1"/>
+    </body>
+    <body name="distractor_1" pos="0 0 -5">
+      <geom name="distractor_1_geom" type="box" size="0.02 0.02 0.03"
+            rgba="0.55 0.55 0.58 1" friction="1.2 0.05 0.001" contype="1" conaffinity="1"/>
+    </body>
+    <body name="distractor_2" pos="0 0 -5">
+      <geom name="distractor_2_geom" type="box" size="0.02 0.02 0.03"
+            rgba="0.55 0.55 0.58 1" friction="1.2 0.05 0.001" contype="1" conaffinity="1"/>
     </body>
   </worldbody>
 

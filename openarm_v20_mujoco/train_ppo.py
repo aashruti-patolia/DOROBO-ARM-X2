@@ -246,8 +246,9 @@ def train(args):
     env = BimanualPickPlaceEnv(
         model_path=args.model,
         reward_config=reward_config,
-        domain_randomization=not args.no_domain_rand,
-        obs_noise_scale=0.002 if not args.no_domain_rand else 0.0,
+        domain_randomization=args.dr_level != "off",
+        randomization_level=args.dr_level,
+        obs_noise_scale=0.002 if args.dr_level != "off" else 0.0,
         render_mode=None,
     )
 
@@ -376,6 +377,7 @@ def train(args):
                         writer.add_scalar("charts/success_rate", success_rate, global_step)
                         writer.add_scalar("charts/episode_length", np.mean(episode_lengths[-20:]), global_step)
                         writer.add_scalar("charts/collision_curriculum", collision_weight, global_step)
+                        writer.add_scalar("scenario/table_z", step_info["scenario"]["table_z"], global_step)
 
                 episode_reward = 0.0
                 episode_length = 0
@@ -485,7 +487,11 @@ def parse_args():
     )
     parser.add_argument("--headless", action="store_true", help="No rendering")
     parser.add_argument("--no-domain-rand", action="store_true",
-                        help="Disable domain randomization")
+                        help="Disable domain randomization (same as --dr-level off)")
+    parser.add_argument("--dr-level", choices=["off", "mild", "full"], default="mild",
+                        help="How strongly each episode's world varies: table height, object "
+                             "sizes, friction, sensor noise, distractors, disturbances "
+                             "(plus physics/latency/perception randomisation)")
 
     # PPO hyperparameters
     parser.add_argument("--total-timesteps", type=int, default=500_000,
@@ -528,6 +534,8 @@ def parse_args():
                         help="Torch device (cpu, cuda, auto)")
 
     args = parser.parse_args()
+    if args.no_domain_rand:
+        args.dr_level = "off"
 
     # Auto-detect device
     if args.device == "auto":

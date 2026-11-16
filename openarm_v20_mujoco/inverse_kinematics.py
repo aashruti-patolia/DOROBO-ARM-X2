@@ -200,6 +200,10 @@ class OpenArmIK:
         MjData instance is always used so IK never corrupts live simulation state.
     config : IKConfig, optional
         Solver configuration. Uses defaults if not provided.
+    left_site, right_site : str, optional
+        Names of the sites the solver drives to the target pose. Default to
+        the TCP sites; pass other sites (e.g. a gripper pinch point) to
+        target them instead.
     """
 
     def __init__(
@@ -207,6 +211,8 @@ class OpenArmIK:
         model_or_path: str | Path | mujoco.MjModel,
         data: mujoco.MjData | None = None,
         config: IKConfig | None = None,
+        left_site: str = LEFT_EE_SITE,
+        right_site: str = RIGHT_EE_SITE,
     ):
         if isinstance(model_or_path, mujoco.MjModel):
             self.model = model_or_path
@@ -226,14 +232,14 @@ class OpenArmIK:
 
         # Resolve site IDs for end-effector TCP points
         self._left_site_id = mujoco.mj_name2id(
-            self.model, mujoco.mjtObj.mjOBJ_SITE, LEFT_EE_SITE)
+            self.model, mujoco.mjtObj.mjOBJ_SITE, left_site)
         self._right_site_id = mujoco.mj_name2id(
-            self.model, mujoco.mjtObj.mjOBJ_SITE, RIGHT_EE_SITE)
+            self.model, mujoco.mjtObj.mjOBJ_SITE, right_site)
 
         if self._left_site_id < 0 or self._right_site_id < 0:
             raise ValueError(
-                f"EE sites not found in model. Expected '{LEFT_EE_SITE}' "
-                f"and '{RIGHT_EE_SITE}'. Available sites: "
+                f"EE sites not found in model. Expected '{left_site}' "
+                f"and '{right_site}'. Available sites: "
                 + str([mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_SITE, i)
                        for i in range(self.model.nsite)]))
 
@@ -396,6 +402,7 @@ class OpenArmIK:
         target_pos: np.ndarray,
         target_quat: np.ndarray | None = None,
         q_init: np.ndarray | None = None,
+        posture: np.ndarray | None = None,
     ) -> IKResult:
         """Damped Least-Squares IK for a single 7-DoF arm.
 
@@ -420,6 +427,11 @@ class OpenArmIK:
             If None, orientation is unconstrained (position-only IK).
         q_init : ndarray (7,) or None
             Initial guess. If None, uses home_pose.
+        posture : ndarray (7,) or None
+            Nullspace posture target the redundant DoF is pulled toward.
+            Defaults to ``home_pose``. Pass the current joint angles to hold
+            the wrist as it is (e.g. while carrying an object) instead of
+            letting it drift back toward the home posture.
 
         Returns
         -------
@@ -458,6 +470,7 @@ class OpenArmIK:
 
         lam2 = cfg.damping ** 2
         w = cfg.nullspace_weight
+        posture_target = home_pose if posture is None else posture
 
         converged = False
         iterations = 0
@@ -512,7 +525,7 @@ class OpenArmIK:
             #   dq = J^T (JJ^T + λ²I)^{-1} (dx - w J p) + w p
             JJT = J @ J.T
             JJT.flat[::JJT.shape[0] + 1] += lam2
-            posture_err = home_pose - q
+            posture_err = posture_target - q
             dq = J.T @ np.linalg.solve(JJT, dx - w * (J @ posture_err))
             dq += w * posture_err
 
@@ -546,6 +559,7 @@ class OpenArmIK:
         target_pos: np.ndarray | list[float],
         target_quat: np.ndarray | list[float] | None = None,
         q_init: np.ndarray | list[float] | None = None,
+        posture: np.ndarray | list[float] | None = None,
     ) -> IKResult:
         """Solve IK for the left arm.
 
@@ -555,6 +569,8 @@ class OpenArmIK:
         target_quat : (4,) desired orientation [w, x, y, z], or None for
                       position-only IK (orientation unconstrained).
         q_init : (7,) initial joint angle guess, or None for home pose.
+        posture : (7,) nullspace posture target (default: the home pose);
+                  pass the current joints to hold the wrist where it is.
 
         Returns
         -------
@@ -573,6 +589,8 @@ class OpenArmIK:
                          if target_quat is not None else None),
             q_init=(np.asarray(q_init, dtype=np.float64)
                     if q_init is not None else None),
+            posture=(np.asarray(posture, dtype=np.float64)
+                     if posture is not None else None),
         )
 
     def solve_right(
@@ -580,6 +598,7 @@ class OpenArmIK:
         target_pos: np.ndarray | list[float],
         target_quat: np.ndarray | list[float] | None = None,
         q_init: np.ndarray | list[float] | None = None,
+        posture: np.ndarray | list[float] | None = None,
     ) -> IKResult:
         """Solve IK for the right arm.
 
@@ -606,6 +625,8 @@ class OpenArmIK:
                          if target_quat is not None else None),
             q_init=(np.asarray(q_init, dtype=np.float64)
                     if q_init is not None else None),
+            posture=(np.asarray(posture, dtype=np.float64)
+                     if posture is not None else None),
         )
 
     # -----------------------------------------------------------------
