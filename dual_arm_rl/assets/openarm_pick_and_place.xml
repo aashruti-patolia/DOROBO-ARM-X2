@@ -65,13 +65,12 @@
     <geom name="openarm_body_link0_visual" pos="0 0 0" quat="1 0 0 0" type="mesh" contype="0" conaffinity="0" group="1" rgba="0.55 0.6 0.68 1" density="0" mesh="robot__openarm_v2.0__body__visual__body_link0"/>
     <geom name="openarm_body_link0_collision" pos="0 0 0" quat="1 0 0 0" type="mesh" group="3" mesh="robot__openarm_v2.0__body__collision__body_link0_symp"/>
 
-    <!-- ===== Sensor 5: Head Camera — ZED Stereo Depth Camera ===== -->
-    <!-- Mounted on the FRONT of the central pedestal column (MISUMI extrusion) -->
-    <!-- between the shoulders at X = +0.08 m, Z = 0.79 m. Provides a top-down   -->
-    <!-- egocentric perspective facing forward (+X) and tilted downward (35°)   -->
-    <!-- toward the manipulation workspace. ZED Mini baseline: 63 mm.            -->
-    <!-- Head camera tilted 55 deg down to directly view the table workspace -->
-    <body name="openarm_head_camera_mount" pos="0.08 0 0.79" quat="0.887011 0 0.461749 0">
+    <!-- ===== Sensor 5: Head Camera - ZED Mini stereo depth camera ===== -->
+    <!-- Mounted on the front of the central pedestal between the shoulders at  -->
+    <!-- X = +0.08 m, Z = 0.79 m, looking forward (+X) and pitched 65 deg down so -->
+    <!-- it sees the whole region both arms can grasp in (55 deg missed the near  -->
+    <!-- half of it). ZED Mini baseline: 63 mm, 16:9 sensor, 60 deg vertical FOV. -->
+    <body name="openarm_head_camera_mount" pos="0.08 0 0.79" quat="0.843391 0 0.5373 0">
       <inertial pos="0 0 0" mass="0.063" diaginertia="1e-5 1e-5 1e-5"/>
       <!-- Visual representation of the ZED Mini camera body (front-facing) -->
       <geom name="head_camera_body" type="box"
@@ -91,7 +90,7 @@
             contype="0" conaffinity="0" group="1"
             rgba="0.05 0.05 0.3 1" density="0"/>
 
-      <!-- Stereo camera pair (63 mm baseline, looking forward +X, pitched 35° down) -->
+      <!-- Stereo camera pair (63 mm baseline, looking forward +X) -->
       <camera name="openarm_head_camera_left"
               pos="0 0.0315 0"
               quat="0.5 0.5 -0.5 -0.5"
@@ -100,7 +99,7 @@
               pos="0 -0.0315 0"
               quat="0.5 0.5 -0.5 -0.5"
               fovy="60" resolution="1280 720"/>
-      <!-- Mono centre viewpoint for convenience (RL training default) -->
+      <!-- Mono centre viewpoint: used by the perception pipeline -->
       <camera name="openarm_head_camera_center"
               pos="0 0 0"
               quat="0.5 0.5 -0.5 -0.5"
@@ -149,7 +148,7 @@
                     <site name="left_ee_site" pos="-0.00143 0 -0.093" size="0.008" rgba="0 1 0 0.5" group="4"/>
                     <!-- Pinch point: midway between the finger pads, 13 mm above the fingertips,
                          i.e. where the ball centre sits when it is gripped. The TCP site above is
-                         ~65 mm higher up the fingers (kept as-is for pick_and_place.py). -->
+                         ~65 mm higher up the fingers. -->
                     <site name="left_pinch_site" pos="-0.00143 0 -0.158" size="0.006" rgba="1 0 1 0.6" group="4"/>
                     <body name="openarm_left_ee_link1" pos="-0.00143 -0.018 -0.068" gravcomp="1">
                       <inertial pos="-0.0124991 -0.00176593 -0.0241663" quat="0.982638 0.0922083 -0.15927 -0.0235192" mass="0.125979" diaginertia="3.8543e-05 3.6883e-05 1.43942e-05"/>
@@ -221,7 +220,7 @@
                     <site name="right_ee_site" pos="-0.00143 0 -0.093" size="0.008" rgba="0 1 0 0.5" group="4"/>
                     <!-- Pinch point: midway between the finger pads, 13 mm above the fingertips,
                          i.e. where the ball centre sits when it is gripped. The TCP site above is
-                         ~65 mm higher up the fingers (kept as-is for pick_and_place.py). -->
+                         ~65 mm higher up the fingers. -->
                     <site name="right_pinch_site" pos="-0.00143 0 -0.158" size="0.006" rgba="1 0 1 0.6" group="4"/>
                     <body name="openarm_right_ee_link1" pos="-0.00143 0.018 -0.068" gravcomp="1">
                       <inertial pos="-0.0124991 0.00176593 -0.0241663" quat="0.982638 -0.0922083 -0.15927 0.0235192" mass="0.125979" diaginertia="3.8543e-05 3.6883e-05 1.43942e-05"/>
@@ -264,8 +263,10 @@
     <!-- Red Ball to be picked -->
     <body name="ball" pos="0.22 0.14 0.272">
       <freejoint name="ball_joint"/>
-      <geom name="ball_geom" type="sphere" size="0.022" mass="0.03"
-            rgba="0.95 0.12 0.12 1" friction="1.8 0.05 0.001"
+      <!-- condim 6: rolling/torsional friction act, so a rolling or nudged ball slows
+           down and stops (with the default condim 3 it rolled forever) -->
+      <geom name="ball_geom" type="sphere" size="0.022" mass="0.03" condim="6"
+            rgba="0.95 0.12 0.12 1" friction="1.8 0.005 0.001"
             solref="0.02 1.5" solimp="0.95 0.99 0.001"/>
       <site name="ball_center_site" pos="0 0 0" size="0.006" rgba="1 1 0 0.4"/>
     </body>
@@ -305,8 +306,6 @@
   <equality>
     <joint joint1="openarm_left_finger_joint2" joint2="openarm_left_finger_joint1"/>
     <joint joint1="openarm_right_finger_joint2" joint2="openarm_right_finger_joint1"/>
-    <weld name="left_grasp_weld" body1="openarm_left_ee_base_link" body2="ball" active="false"/>
-    <weld name="right_grasp_weld" body1="openarm_right_ee_base_link" body2="ball" active="false"/>
   </equality>
 
   <actuator>

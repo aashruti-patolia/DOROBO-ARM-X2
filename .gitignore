@@ -1,18 +1,18 @@
-# Byte-compiled / optimized / DLL files
+# Byte-compiled / caches
 __pycache__/
 *.py[cod]
 *$py.class
+.pytest_cache/
 
-# PyTorch checkpoints and training logs (optional: comment out if you want to track pre-trained weights)
+# Everything a run produces (checkpoints, TensorBoard logs, eval reports, demo GIFs)
+outputs/
 *.pt
 *.pth
-runs/
-checkpoints/
 
-# Virtual environments
-venv/
-.venv/
-env/
+# Virtual environments (root only: dual_arm_rl/env/ is source code)
+/venv/
+/.venv/
+/env/
 
 # IDE and OS files
 .vscode/
@@ -20,6 +20,5 @@ env/
 .DS_Store
 Thumbs.db
 
-# MuJoCo output / logs
-mj_out/
+# Logs
 *.log
